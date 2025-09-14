@@ -1,0 +1,4216 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Cube Editor - Using Main Game Engine</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r95/three.min.js"></script>
+  <script src="https://unpkg.com/cubejs@1.3.2/lib/cube.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+      font-family: 'Arial', sans-serif;
+      overflow-x: hidden;
+      /* Prevent horizontal scrolling */
+      overflow-y: auto;
+      /* Allow vertical scrolling when needed */
+      color: white;
+      min-height: 100vh;
+    }
+
+    .container {
+      display: flex;
+      min-height: 100vh;
+      height: auto;
+      flex-direction: row;
+    }
+
+    .cube-area {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+    }
+
+    .cube-container {
+      position: relative;
+      display: none;
+      /* Initially hidden until cube loads */
+    }
+
+    #cubeCanvas {
+      cursor: pointer;
+      border-radius: 10px;
+      box-shadow: 0 0 30px rgba(0, 150, 255, 0.3);
+      position: relative;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      height: auto;
+      display: block;
+    }
+
+    #cubeCanvas:active {
+      cursor: pointer;
+    }
+
+    .controls-panel {
+      width: 350px;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(10px);
+      padding: 20px;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .section {
+      margin-bottom: 30px;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    .section.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .section h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #4db8ff;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Camera controls */
+    .camera-control {
+      margin-bottom: 20px;
+    }
+
+    .camera-control label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4db8ff;
+      font-size: 14px;
+    }
+
+    /* Range slider styles - matching main game */
+    .range {
+      position: relative;
+      margin: 1.2rem 0;
+      padding: 0;
+    }
+
+    .range:not(:last-child) {
+      margin-bottom: 2rem;
+    }
+
+    .range__label {
+      font-size: 1rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 0.8rem;
+      display: block;
+    }
+
+    .range__track {
+      position: relative;
+      height: 0.4rem;
+      margin: 1rem 0;
+      cursor: pointer;
+    }
+
+    .range__track-line {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 0.2rem;
+    }
+
+    .range__handle {
+      position: absolute;
+      top: 50%;
+      width: 1.2rem;
+      height: 1.2rem;
+      margin-top: -0.6rem;
+      margin-left: -0.6rem;
+      cursor: grab;
+      z-index: 2;
+    }
+
+    .range__handle:active {
+      cursor: grabbing;
+    }
+
+    .range__handle div {
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    .range.is-active .range__handle div {
+      background: #fff;
+      transform: scale(1.1);
+    }
+
+    .range__list {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .range__list div {
+      text-align: center;
+      flex: 1;
+    }
+
+    .slider-container {
+      position: relative;
+    }
+
+    .slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4db8ff;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .slider::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #4db8ff;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .slider-value {
+      position: absolute;
+      right: 0;
+      top: -25px;
+      color: #ffffff;
+      font-size: 12px;
+    }
+
+    .color-palette {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .color-option {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      color: #000;
+      text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.8);
+    }
+
+    .color-option:hover {
+      transform: scale(1.1);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    }
+
+    .color-option.selected {
+      border-color: #fff;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+      transform: scale(1.05);
+    }
+
+    .color-option[data-color="U"] {
+      background: #ffffff;
+      /* White */
+    }
+
+    .color-option[data-color="R"] {
+      background: #ef3923;
+      /* Red */
+    }
+
+    .color-option[data-color="F"] {
+      background: #82ca38;
+      /* Green */
+    }
+
+    .color-option[data-color="D"] {
+      background: #ffef48;
+      /* Yellow */
+    }
+
+    .color-option[data-color="L"] {
+      background: #ff8c0a;
+      /* Orange */
+    }
+
+    .color-option[data-color="B"] {
+      background: #41aac8;
+      /* Blue */
+    }
+
+    .action-button {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      border: 3px solid #666;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 10px;
+      color: #fff;
+      background: linear-gradient(135deg, #555 0%, #333 100%);
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .action-button:hover {
+      transform: scale(1.1);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+      border-color: #888;
+    }
+
+    .action-button.active {
+      border-color: #fff;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+      transform: scale(1.05);
+      background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    }
+
+    .reset-button:hover {
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .btn {
+      background: linear-gradient(135deg, #4db8ff 0%, #0066cc 100%);
+      border: none;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(77, 184, 255, 0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(77, 184, 255, 0.4);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.danger {
+      background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+      box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+    }
+
+    .btn.danger:hover {
+      box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4);
+    }
+
+    .btn.success {
+      background: linear-gradient(135deg, #2ed573 0%, #1e90ff 100%);
+      box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
+    }
+
+    .btn.success:hover {
+      box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4);
+    }
+
+    .btn.solve-btn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+      transition: all 0.3s ease;
+    }
+
+    .btn.solve-btn:hover {
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+      transform: translateY(-2px);
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    @keyframes touchPulse {
+      0% {
+        transform: scale(0.5);
+        opacity: 1;
+      }
+
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    .solution-panel {
+      margin-top: 20px;
+      background: rgba(156, 136, 255, 0.1);
+      border: 2px solid rgba(156, 136, 255, 0.3);
+      border-radius: 12px;
+      padding: 15px;
+      width: 100%;
+      box-sizing: border-box;
+      overflow-x: hidden;
+    }
+
+    .solution-panel .section h2 {
+      margin-top: 0;
+      color: #9c88ff;
+    }
+
+    .solution-info {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+    }
+
+    .solution-moves {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin: 10px 0;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .solution-controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+
+    .solution-controls .btn {
+      flex: 1;
+      font-size: 12px;
+      padding: 8px 12px;
+    }
+
+    .continue-btn {
+      width: 100%;
+      font-size: 16px;
+      padding: 15px 20px;
+      background: linear-gradient(135deg, #2ed573 0%, #27ae60 100%);
+      box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .continue-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 25px rgba(46, 213, 115, 0.6);
+    }
+
+    .continue-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+      transition: left 0.5s;
+    }
+
+    .continue-btn:hover::before {
+      left: 100%;
+    }
+
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: scale(0.8);
+      }
+
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .info-section {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .info-section p {
+      margin: 8px 0;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .info-section strong {
+      color: #4db8ff;
+    }
+
+    .info-section code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #4db8ff;
+    }
+
+    .pattern-display {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 10px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      word-break: break-all;
+      line-height: 1.3;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      z-index: 10;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      border-top: 4px solid #4db8ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .instructions {
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.3);
+      border-radius: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .instructions h3 {
+      color: #ffc107;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+
+    /* State input box styles */
+    .state-input-section {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(10px);
+      padding: 15px 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      border: 1px solid rgba(77, 184, 255, 0.3);
+    }
+
+    .state-input-section h3 {
+      color: #4db8ff;
+      font-size: 16px;
+      margin: 0 0 10px 0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .state-input-container {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .state-input {
+      flex: 1;
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(77, 184, 255, 0.5);
+      border-radius: 5px;
+      color: white;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .state-input:focus {
+      outline: none;
+      border-color: #4db8ff;
+      box-shadow: 0 0 10px rgba(77, 184, 255, 0.3);
+    }
+
+    .state-input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    .load-state-btn {
+      padding: 8px 15px;
+      background: linear-gradient(135deg, #4db8ff 0%, #0066cc 100%);
+      border: none;
+      border-radius: 5px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .load-state-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(77, 184, 255, 0.4);
+    }
+
+    .load-state-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Mobile responsive adjustments for state input */
+    @media (max-width: 768px) {
+      .state-input-section {
+        margin: 10px;
+        padding: 12px 15px;
+      }
+
+      .state-input-container {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .state-input {
+        font-size: 12px;
+        padding: 10px;
+      }
+
+      .load-state-btn {
+        padding: 10px 20px;
+        align-self: stretch;
+      }
+    }
+
+    /* Toast notification styles */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 71, 87, 0.95);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+      z-index: 1000;
+      transform: translateX(400px);
+      opacity: 0;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .toast.show {
+      transform: translateX(0);
+      opacity: 1;
+    }
+
+    .toast.success {
+      background: rgba(46, 213, 115, 0.95);
+      box-shadow: 0 4px 15px rgba(46, 213, 115, 0.4);
+    }
+
+    .toast.info {
+      background: rgba(77, 184, 255, 0.95);
+      box-shadow: 0 4px 15px rgba(77, 184, 255, 0.4);
+    }
+
+    .toast.warning {
+      background: rgba(255, 193, 7, 0.95);
+      box-shadow: 0 4px 15px rgba(255, 193, 7, 0.4);
+      color: #333;
+    }
+
+    /* Animation for cube interactions */
+    .cube-piece {
+      transition: transform 0.2s ease;
+    }
+
+    .cube-piece:hover {
+      transform: scale(1.05);
+    }
+
+    /* Rotation buttons styles */
+    .rotation-buttons {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .rotation-button {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: rgba(77, 184, 255, 0.8);
+      border: none;
+      border-radius: 50%;
+      color: white;
+      font-weight: bold;
+      pointer-events: all;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .rotation-button:hover {
+      background: rgba(77, 184, 255, 1);
+      transform: scale(1.1);
+    }
+
+    .rotation-button:disabled,
+    .rotation-button.disabled {
+      background: rgba(77, 184, 255, 0.3);
+      cursor: not-allowed;
+      transform: scale(1);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .rotation-button.pos1 {
+      top: 5%;
+      left: 22%;
+    }
+
+    .rotation-button.pos2 {
+      top: 5%;
+      right: 22%;
+    }
+
+    .rotation-button.pos3 {
+      top: 50%;
+      right: 2%;
+    }
+
+    .rotation-button.pos4 {
+      bottom: 5%;
+      right: 22%;
+    }
+
+    .rotation-button.pos5 {
+      bottom: 5%;
+      left: 22%;
+    }
+
+    .rotation-button.pos6 {
+      top: 50%;
+      left: 2%;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1024px) {
+      .controls-panel {
+        width: 300px;
+        padding: 15px;
+      }
+
+      .section h2 {
+        font-size: 16px;
+      }
+
+      .color-option {
+        width: 50px;
+        height: 50px;
+        font-size: 12px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      body {
+        overflow-y: auto;
+        /* Allow scrolling on mobile */
+        overflow-x: hidden;
+        /* Prevent horizontal scrolling */
+      }
+
+      .container {
+        flex-direction: column;
+        min-height: 100vh;
+        height: auto;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
+      }
+
+      .cube-area {
+        height: 50vh;
+        min-height: 300px;
+        max-height: 70vh;
+        flex-shrink: 0;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .controls-panel {
+        width: 100%;
+        height: auto;
+        min-height: 50vh;
+        max-height: none;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        overflow-y: visible;
+        overflow-x: hidden;
+        /* Prevent horizontal overflow */
+        flex: 1;
+        box-sizing: border-box;
+        /* Include padding in width calculation */
+        max-width: 100vw;
+        /* Ensure it doesn't exceed viewport width */
+      }
+
+      .section {
+        margin-bottom: 20px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+        /* Prevent section content from overflowing */
+      }
+
+      .color-palette {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .color-option,
+      .action-button {
+        width: 50px;
+        height: 50px;
+        font-size: 12px;
+        /* Improved touch targets for mobile */
+        min-width: 44px;
+        min-height: 44px;
+      }
+
+      .btn {
+        padding: 15px 20px;
+        font-size: 16px;
+        /* Larger touch targets for buttons */
+        min-height: 48px;
+        width: 100%;
+        box-sizing: border-box;
+        max-width: 100%;
+      }
+
+      .rotation-button {
+        width: 40px;
+        height: 40px;
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+
+      .instructions {
+        font-size: 12px;
+        padding: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+        word-wrap: break-word;
+      }
+
+      /* Camera controls width containment */
+      .camera-control {
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      .slider-container {
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Improve canvas touch handling */
+      #cubeCanvas {
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        max-width: 95vw;
+        max-height: 45vh;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .container {
+        flex-direction: column;
+        min-height: 100vh;
+        height: auto;
+      }
+
+      .cube-area {
+        height: 45vh;
+        min-height: 250px;
+        max-height: 60vh;
+        flex-shrink: 0;
+      }
+
+      .controls-panel {
+        height: auto;
+        min-height: 55vh;
+        padding: 12px;
+        overflow-y: visible;
+        overflow-x: hidden;
+        /* Prevent horizontal overflow */
+        flex: 1;
+        box-sizing: border-box;
+        /* Include padding in width calculation */
+        max-width: 100vw;
+        /* Ensure it doesn't exceed viewport width */
+        width: 100%;
+      }
+
+      .section {
+        margin-bottom: 15px;
+      }
+
+      .section h2 {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .color-palette {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+      }
+
+      .color-option,
+      .action-button {
+        width: 42px;
+        height: 42px;
+        font-size: 10px;
+        /* Ensure minimum touch target size */
+        min-width: 42px;
+        min-height: 42px;
+      }
+
+      .btn {
+        padding: 10px 14px;
+        font-size: 14px;
+        min-height: 42px;
+      }
+
+      .rotation-button {
+        width: 32px;
+        height: 32px;
+        font-size: 10px;
+      }
+
+      .instructions {
+        font-size: 11px;
+        padding: 8px;
+      }
+
+      /* Additional mobile optimizations */
+      .slider {
+        height: 6px;
+      }
+
+      .slider-value {
+        font-size: 11px;
+      }
+
+      .camera-control {
+        margin-bottom: 12px;
+      }
+
+      .camera-control label {
+        font-size: 12px;
+      }
+
+      /* Canvas sizing for small screens */
+      #cubeCanvas {
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        -webkit-user-select: none;
+        max-width: 92vw;
+        max-height: 40vh;
+      }
+
+      /* Solution panel adjustments */
+      .solution-panel {
+        margin-top: 15px;
+        padding: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: hidden;
+      }
+
+      .solution-moves {
+        font-size: 11px;
+        padding: 8px;
+        word-break: break-all;
+        overflow-wrap: break-word;
+        max-width: 100%;
+        box-sizing: border-box;
+      }
+
+      .solution-controls {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .solution-controls .btn {
+        font-size: 12px;
+        padding: 8px 12px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      /* Prevent zoom on double tap but allow necessary gestures */
+      * {
+        touch-action: manipulation;
+      }
+
+      #cubeCanvas {
+        touch-action: none;
+      }
+    }
+
+    @media (max-width: 320px) {
+      .controls-panel {
+        padding: 8px;
+      }
+
+      .color-palette {
+        gap: 5px;
+      }
+
+      .color-option {
+        width: 35px;
+        height: 35px;
+        font-size: 9px;
+      }
+
+      .rotation-button {
+        width: 25px;
+        height: 25px;
+        font-size: 10px;
+      }
+
+      .section h2 {
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <!-- State Input Section -->
+    <div class="state-input-section">
+      <h3>🔀 Load Cube State</h3>
+      <div class="state-input-container">
+        <input type="text" id="stateInput" class="state-input"
+          placeholder="Enter cube state (e.g., RRRUUUFFF... or scramble notation)" maxlength="150" />
+        <button id="loadStateBtn" class="load-state-btn">Load</button>
+      </div>
+    </div>
+
+    <div class="cube-area">
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Loading Main Game Engine...</p>
+        <p style="font-size: 10px; margin-top: 10px;">Initializing Three.js r95 and game systems...</p>
+      </div>
+      <div class="cube-container">
+        <canvas id="cubeCanvas" style="display: none;"></canvas>
+        <!-- Rotation Buttons Overlay -->
+        <div class="rotation-buttons">
+          <button class="rotation-button pos1" data-dir="counterClockwiseZ">↖</button>
+          <button class="rotation-button pos2" data-dir="clockwiseZ">↗</button>
+          <button class="rotation-button pos3" data-dir="right">→</button>
+          <button class="rotation-button pos4" data-dir="left">↘</button>
+          <button class="rotation-button pos5" data-dir="up">↙</button>
+          <button class="rotation-button pos6" data-dir="down">←</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls-panel">
+      <div class="section">
+        <h2>🎨 Color Palette</h2>
+        <div class="color-palette">
+          <div class="color-option selected" data-color="U" title="White (Up)">U</div>
+          <div class="color-option" data-color="R" title="Red (Right)">R</div>
+          <div class="color-option" data-color="F" title="Green (Front)">F</div>
+          <div class="color-option" data-color="D" title="Yellow (Down)">D</div>
+          <div class="color-option" data-color="L" title="Orange (Left)">L</div>
+          <div class="color-option" data-color="B" title="Blue (Back)">B</div>
+          <div class="action-button reset-button" id="resetButton" title="Reset all colors on the cube">🔄 Reset</div>
+          <div class="action-button remove-button" id="removeButton" title="Click to remove colors from pieces">🗑️
+            Remove</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>📷 Camera Controls</h2>
+        <div class="camera-control">
+          <label for="fovSlider">Field of View (FOV)</label>
+          <div class="slider-container">
+            <input type="range" id="fovSlider" class="slider" min="5" max="50" value="10" step="1">
+            <span class="slider-value" id="fovValue">10</span>
+          </div>
+        </div>
+        <div class="camera-control">
+          <label for="distanceSlider">Camera Distance</label>
+          <div class="slider-container">
+            <input type="range" id="distanceSlider" class="slider" min="0.5" max="3" value="1" step="0.1">
+            <span class="slider-value" id="distanceValue">1.0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Solve Section - Only shown when cube is fully colored -->
+      <div class="section" id="solveSection" style="display: none;">
+        <h2>🧩 Solve Cube</h2>
+        <button id="solveBtn" class="btn solve-btn" onclick="solveCubeWithCubeJS()">
+          🎯 Get Solution
+        </button>
+        <p id="solveBtnDescription" style="font-size: 12px; opacity: 0.8; margin-top: 8px;">
+          Get step-by-step solving instructions
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global variables using the main game engine approach
+    let world = null;
+    let cube = null;
+    let selectedColor = 'U';
+    let isLoading = true;
+    let raycaster = new THREE.Raycaster();
+    let mouse = new THREE.Vector2();
+
+    // Rotation cooldown system
+    let rotationCooldownActive = false;
+    const ROTATION_COOLDOWN_MS = 500; // 500ms cooldown
+
+    // Color mapping: palette selection to actual colors
+    const colorMap = {
+      'U': 0xffffff, // White -> White
+      'R': 0xef3923, // Red -> Red (from F face center)  
+      'F': 0x82ca38, // Green -> Green (from L face center)
+      'D': 0xffef48, // Yellow -> Yellow
+      'L': 0xff8c0a, // Orange -> Orange (from B face center)
+      'B': 0x41aac8  // Blue -> Blue (from R face center)
+    };
+
+    // Simplified but working RoundedBoxGeometry
+    function RoundedBoxGeometry(size, radius, radiusSegments) {
+      // Use a simple box geometry with slight size reduction for visual rounding
+      const geometry = new THREE.BoxGeometry(size * 0.95, size * 0.95, size * 0.95);
+
+      // Add parameters for compatibility
+      geometry.parameters = {
+        width: size,
+        height: size,
+        depth: size,
+        radius: size * radius,
+        radiusSegments: radiusSegments || 1
+      };
+
+      return geometry;
+    }
+
+    // Proper RoundedPlaneGeometry function from main game
+    function RoundedPlaneGeometry(size, radius, depth) {
+      const x = y = -size / 2;
+      const width = height = size;
+      radius = size * radius;
+
+      const shape = new THREE.Shape();
+
+      shape.moveTo(x, y + radius);
+      shape.lineTo(x, y + height - radius);
+      shape.quadraticCurveTo(x, y + height, x + radius, y + height);
+      shape.lineTo(x + width - radius, y + height);
+      shape.quadraticCurveTo(x + width, y + height, x + width, y + height - radius);
+      shape.lineTo(x + width, y + radius);
+      shape.quadraticCurveTo(x + width, y, x + width - radius, y);
+      shape.lineTo(x + radius, y);
+      shape.quadraticCurveTo(x, y, x, y + radius);
+
+      const geometry = new THREE.ExtrudeBufferGeometry(
+        shape,
+        { depth: depth, bevelEnabled: false, curveSegments: 3 }
+      );
+
+      return geometry;
+    }
+
+    // Mini World class (simplified from main.js)
+    class MiniWorld {
+      constructor() {
+        this.container = document.querySelector('.cube-container');
+        this.scene = new THREE.Scene();
+
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: document.getElementById('cubeCanvas'),
+          antialias: true,
+          alpha: true
+        });
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Initial size - will be updated by resize
+        this.updateCanvasSize();
+        this.renderer.setClearColor(0x1a1a2e, 1.0); // Darker background
+
+        // Camera setup like main game
+        this.camera = new THREE.PerspectiveCamera(2, 1, 0.1, 10000);
+        this.stage = { width: 2, height: 3 }; // Same as main game
+        this.fov = 10; // Default FOV like main game
+        this.distanceMultiplier = 1; // Default distance multiplier
+
+        this.createLights();
+        this.resize(); // Calculate proper camera position
+
+        // Add resize listener with debouncing
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => this.handleResize(), 150);
+        });
+
+        // Also listen for visibility change (minimize/maximize)
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden) {
+            setTimeout(() => this.handleResize(), 200);
+          }
+        });
+
+        // Handle window focus events (when window is restored from minimize)
+        window.addEventListener('focus', () => {
+          setTimeout(() => this.handleResize(), 100);
+        });
+
+
+      }
+
+      updateCanvasSize() {
+        const container = this.container.parentElement; // Get cube-area container
+        const containerRect = container.getBoundingClientRect();
+
+        // Calculate responsive canvas size
+        const maxSize = Math.min(containerRect.width * 0.9, containerRect.height * 0.9);
+        const canvasSize = Math.min(900, Math.max(300, maxSize)); // Min 300px, max 900px
+
+        this.canvasSize = canvasSize;
+        this.renderer.setSize(canvasSize, canvasSize);
+
+        // Update canvas attributes for proper display
+        const canvas = document.getElementById('cubeCanvas');
+        canvas.width = canvasSize;
+        canvas.height = canvasSize;
+        canvas.style.width = canvasSize + 'px';
+        canvas.style.height = canvasSize + 'px';
+
+
+      }
+
+      handleResize() {
+        // Add a small delay to ensure DOM has updated
+        setTimeout(() => {
+          this.updateCanvasSize();
+          this.resize();
+        }, 100);
+      }
+
+      // Exact resize logic from main game
+      resize() {
+        this.width = this.canvasSize || 900; // Use responsive canvas size
+        this.height = this.canvasSize || 900;
+
+        this.renderer.setSize(this.width, this.height);
+
+        this.camera.fov = this.fov;
+        this.camera.aspect = this.width / this.height;
+
+        const aspect = this.stage.width / this.stage.height;
+        const fovRad = this.fov * THREE.Math.DEG2RAD;
+
+        let distance = (aspect < this.camera.aspect)
+          ? (this.stage.height / 2) / Math.tan(fovRad / 2)
+          : (this.stage.width / this.camera.aspect) / (2 * Math.tan(fovRad / 2));
+
+        distance *= this.distanceMultiplier; // Use the adjustable distance multiplier
+
+        this.camera.position.set(distance, distance, distance);
+        this.camera.lookAt(this.scene.position);
+        this.camera.updateProjectionMatrix();
+
+
+      }
+
+      // Force refresh the canvas size - useful for debugging resize issues
+      forceResize() {
+
+        this.handleResize();
+      }
+
+      createLights() {
+        this.lights = {
+          ambient: new THREE.AmbientLight(0xffffff, 0.8),
+          front: new THREE.DirectionalLight(0xffffff, 0.6),
+          back: new THREE.DirectionalLight(0xffffff, 0.3),
+        };
+
+        this.lights.front.position.set(2, 3, 4);
+        this.lights.back.position.set(-2, -1, -2);
+
+        this.scene.add(this.lights.ambient);
+        this.scene.add(this.lights.front);
+        this.scene.add(this.lights.back);
+
+
+      }
+
+      render() {
+        this.renderer.render(this.scene, this.camera);
+      }
+    }
+
+    // Mini Cube class (simplified from main.js)
+    class MiniCube {
+      constructor(world) {
+        this.world = world;
+        this.size = 3;
+
+        this.geometry = {
+          pieceCornerRadius: 0.12,
+          edgeCornerRoundness: 0.15,
+          edgeScale: 0.82,
+          edgeDepth: 0.01,
+        };
+
+        this.holder = new THREE.Object3D();
+        this.object = new THREE.Object3D();
+
+        // Scale up the cube for better visibility
+        this.object.scale.set(3, 3, 3);
+
+        this.holder.add(this.object);
+        this.world.scene.add(this.holder);
+
+        this.pieces = [];
+        this.edges = [];
+
+        this.init();
+      }
+
+      init() {
+        this.generatePositions();
+        this.generateModel();
+
+        this.pieces.forEach(piece => {
+          this.object.add(piece);
+        });
+
+        // Apply initial colors
+        this.updateColors();
+
+
+      }
+
+      generatePositions() {
+        const m = this.size - 1;
+        const first = this.size % 2 !== 0
+          ? 0 - Math.floor(this.size / 2)
+          : 0.5 - this.size / 2;
+
+        this.positions = [];
+
+        for (let x = 0; x < this.size; x++) {
+          for (let y = 0; y < this.size; y++) {
+            for (let z = 0; z < this.size; z++) {
+              let position = new THREE.Vector3(first + x, first + y, first + z);
+              let edges = [];
+
+              if (x == 0) edges.push(0);
+              if (x == m) edges.push(1);
+              if (y == 0) edges.push(2);
+              if (y == m) edges.push(3);
+              if (z == 0) edges.push(4);
+              if (z == m) edges.push(5);
+
+              position.edges = edges;
+              this.positions.push(position);
+            }
+          }
+        }
+      }
+
+      generateModel() {
+        const pieceSize = 1 / 3; // Back to proper size since we have rounded geometry
+        const mainMaterial = new THREE.MeshLambertMaterial();
+
+
+
+        const pieceMesh = new THREE.Mesh(
+          new RoundedBoxGeometry(pieceSize, this.geometry.pieceCornerRadius, 3),
+          mainMaterial.clone()
+        );
+
+
+
+        const edgeGeometry = RoundedPlaneGeometry(
+          pieceSize,
+          this.geometry.edgeCornerRoundness,
+          this.geometry.edgeDepth
+        );
+
+
+
+        this.positions.forEach((position, index) => {
+          const piece = new THREE.Object3D();
+          const pieceCube = pieceMesh.clone();
+          const pieceEdges = [];
+
+          piece.position.copy(position.clone().multiplyScalar(1 / 3)); // Use 1/3 for proper spacing
+          piece.add(pieceCube);
+          piece.name = index;
+
+          position.edges.forEach(edgePos => {
+            const edge = new THREE.Mesh(edgeGeometry.clone(), mainMaterial.clone());
+            const name = ['L', 'R', 'D', 'U', 'B', 'F'][edgePos];
+            const distance = pieceSize / 2;
+
+            edge.position.set(
+              distance * [-1, 1, 0, 0, 0, 0][edgePos],
+              distance * [0, 0, -1, 1, 0, 0][edgePos],
+              distance * [0, 0, 0, 0, -1, 1][edgePos]
+            );
+
+            edge.rotation.set(
+              Math.PI / 2 * [0, 0, 1, -1, 0, 0][edgePos],
+              Math.PI / 2 * [-1, 1, 0, 0, 2, 0][edgePos],
+              0
+            );
+
+            edge.scale.set(
+              this.geometry.edgeScale,
+              this.geometry.edgeScale,
+              this.geometry.edgeScale
+            );
+
+            edge.name = name;
+            piece.add(edge);
+            pieceEdges.push(name);
+            this.edges.push(edge);
+          });
+
+          piece.userData = { edges: pieceEdges, cube: pieceCube };
+          this.pieces.push(piece);
+        });
+
+
+      }
+
+      updateColors() {
+        // Start with all black cube, but color center pieces
+        const centerColors = {
+          U: 0xffffff, // white
+          D: 0xffef48, // yellow
+          F: 0xef3923, // red
+          R: 0x41aac8, // blue
+          B: 0xff8c0a, // orange
+          L: 0x82ca38, // green
+        };
+
+        const blackColor = 0x222222; // dark gray/black
+        const pieceColor = 0x111111; // piece color (darker)
+
+        this.pieces.forEach(piece => {
+          piece.userData.cube.material.color.setHex(pieceColor);
+        });
+
+        this.edges.forEach(edge => {
+          // Check if this is a center piece
+          if (this.isCenterPiece(edge)) {
+            // Color center pieces with their traditional colors
+            edge.material.color.setHex(centerColors[edge.name] || blackColor);
+          } else {
+            // All other pieces start black
+            edge.material.color.setHex(blackColor);
+          }
+        });
+
+
+      }
+
+      // Helper function to determine if an edge is a center piece
+      isCenterPiece(edge) {
+        const piece = edge.parent;
+        if (!piece || !piece.position) return false;
+
+        // Center pieces are at positions where only one coordinate is non-zero
+        // and the other two are approximately zero (within tolerance)
+        const pos = piece.position;
+        const tolerance = 0.1;
+
+        const isCenter =
+          // Check if it's a center piece by position
+          (Math.abs(pos.x) < tolerance && Math.abs(pos.y) < tolerance && Math.abs(pos.z) > tolerance) || // Front/Back center
+          (Math.abs(pos.x) < tolerance && Math.abs(pos.y) > tolerance && Math.abs(pos.z) < tolerance) || // Up/Down center
+          (Math.abs(pos.x) > tolerance && Math.abs(pos.y) < tolerance && Math.abs(pos.z) < tolerance);   // Left/Right center
+
+        return isCenter;
+      }
+    }
+
+    // Draggable class - simplified from main game
+    class Draggable {
+      constructor(element, options = {}) {
+        this.element = element;
+        this.calcDelta = options.calcDelta || false;
+
+        this.onDragStart = () => { };
+        this.onDragMove = () => { };
+        this.onDragEnd = () => { };
+
+        this.position = { x: 0, y: 0 };
+        this.delta = { x: 0, y: 0 };
+        this.dragging = false;
+
+        this.initEvents();
+      }
+
+      initEvents() {
+        const onPointerDown = (e) => {
+          e.preventDefault();
+          this.dragging = true;
+          this.position.x = e.clientX || e.touches[0].clientX;
+          this.position.y = e.clientY || e.touches[0].clientY;
+          this.onDragStart(this.position);
+
+          document.addEventListener('mousemove', onPointerMove);
+          document.addEventListener('mouseup', onPointerUp);
+          document.addEventListener('touchmove', onPointerMove);
+          document.addEventListener('touchend', onPointerUp);
+        };
+
+        const onPointerMove = (e) => {
+          if (!this.dragging) return;
+          e.preventDefault();
+
+          const clientX = e.clientX || e.touches[0].clientX;
+          const clientY = e.clientY || e.touches[0].clientY;
+
+          if (this.calcDelta) {
+            this.delta.x = clientX - this.position.x;
+            this.delta.y = clientY - this.position.y;
+          }
+
+          this.position.x = clientX;
+          this.position.y = clientY;
+
+          this.onDragMove({ position: this.position, delta: this.delta });
+        };
+
+        const onPointerUp = (e) => {
+          if (!this.dragging) return;
+          this.dragging = false;
+          this.onDragEnd(this.position);
+
+          document.removeEventListener('mousemove', onPointerMove);
+          document.removeEventListener('mouseup', onPointerUp);
+          document.removeEventListener('touchmove', onPointerMove);
+          document.removeEventListener('touchend', onPointerUp);
+        };
+
+        this.element.addEventListener('mousedown', onPointerDown);
+        this.element.addEventListener('touchstart', onPointerDown);
+      }
+    }
+
+    // Range class - simplified from main game
+    class Range {
+      constructor(name, options = {}) {
+        this.options = Object.assign({
+          range: [0, 1],
+          value: 0,
+          step: 0,
+          onUpdate: () => { },
+          onComplete: () => { },
+        }, options);
+
+        this.element = document.querySelector(`.range[name="${name}"]`);
+        if (!this.element) {
+          console.error(`Range element with name="${name}" not found`);
+          return;
+        }
+
+        this.track = this.element.querySelector('.range__track');
+        this.handle = this.element.querySelector('.range__handle');
+        this.list = Array.from(this.element.querySelectorAll('.range__list div'));
+
+        this.value = this.options.value;
+        this.min = this.options.range[0];
+        this.max = this.options.range[1];
+        this.step = this.options.step;
+
+        this.onUpdate = this.options.onUpdate;
+        this.onComplete = this.options.onComplete;
+
+        this.setValue(this.value);
+        this.initDraggable();
+      }
+
+      setValue(value) {
+        this.value = this.round(this.limitValue(value));
+        this.setHandlePosition();
+      }
+
+      initDraggable() {
+        let current;
+
+        this.draggable = new Draggable(this.handle, { calcDelta: true });
+
+        this.draggable.onDragStart = (position) => {
+          current = this.positionFromValue(this.value);
+          this.handle.style.left = current + 'px';
+          this.element.classList.add('is-active');
+        };
+
+        this.draggable.onDragMove = (position) => {
+          current = this.limitPosition(current + position.delta.x);
+          this.value = this.round(this.valueFromPosition(current));
+          this.setHandlePosition();
+          this.onUpdate(this.value);
+        };
+
+        this.draggable.onDragEnd = (position) => {
+          this.element.classList.remove('is-active');
+          this.onComplete(this.value);
+        };
+      }
+
+      round(value) {
+        if (this.step < 1) return value;
+        return Math.round((value - this.min) / this.step) * this.step + this.min;
+      }
+
+      limitValue(value) {
+        const max = Math.max(this.max, this.min);
+        const min = Math.min(this.max, this.min);
+        return Math.min(Math.max(value, min), max);
+      }
+
+      limitPosition(position) {
+        return Math.min(Math.max(position, 0), this.track.offsetWidth);
+      }
+
+      percentsFromValue(value) {
+        return (value - this.min) / (this.max - this.min);
+      }
+
+      valueFromPosition(position) {
+        return this.min + (this.max - this.min) * (position / this.track.offsetWidth);
+      }
+
+      positionFromValue(value) {
+        return this.percentsFromValue(value) * this.track.offsetWidth;
+      }
+
+      setHandlePosition() {
+        this.handle.style.left = this.percentsFromValue(this.value) * 100 + '%';
+      }
+    }
+
+    // Initialize the cube editor using main game engine
+    async function init() {
+
+
+      try {
+        updateStatus('Creating world...');
+
+        world = new MiniWorld();
+
+
+        updateStatus('Creating cube...');
+
+        cube = new MiniCube(world);
+
+
+        updateStatus('Setting up controls...');
+
+        setupControls();
+        setupColorPalette();
+        setupCameraControls();
+        setupContinueButton();
+
+        updateStatus('Starting render loop...');
+
+        animate();
+
+        // Hide loading and show canvas
+
+        document.getElementById('loading').style.display = 'none';
+        document.querySelector('.cube-container').style.display = 'block';
+        document.getElementById('cubeCanvas').style.display = 'block';
+
+        updateStatus('Ready!');
+        isLoading = false;
+
+        // Print initial vertex positions
+        console.log('=== INITIAL VERTEX POSITIONS ===');
+        VertexTracker.showAllVertices();
+
+        updatePattern();
+
+        // Test render immediately
+        if (world && cube) {
+
+          world.render();
+        }
+
+      } catch (error) {
+        console.error('Failed to initialize cube editor:', error);
+        console.error('Error stack:', error.stack);
+        document.getElementById('loading').innerHTML = `
+          <div style="color: #ff4757;">
+            <h3>❌ Loading Failed</h3>
+            <p>Could not initialize the cube editor.</p>
+            <p style="font-size: 10px; margin-top: 10px;">${error.message}</p>
+            <button onclick="location.reload()" style="margin-top: 10px; padding: 5px 10px; background: #4db8ff; border: none; color: white; border-radius: 4px; cursor: pointer;">Retry</button>
+          </div>
+        `;
+      }
+    }
+
+    function updateStatus(status) {
+      const statusElement = document.getElementById('engineStatus');
+      if (statusElement) {
+        statusElement.textContent = status;
+      }
+
+      const loadingText = document.querySelector('#loading p');
+      if (loadingText) {
+        loadingText.textContent = status;
+      }
+    }
+
+    function setupControls() {
+      const canvas = document.getElementById('cubeCanvas');
+      let isDragging = false;
+      let startMouse = { x: 0, y: 0 };
+      let lastMouse = { x: 0, y: 0 };
+      let hasMoved = false;
+      let isRotating = false; // Track if we're currently animating a rotation
+      let lastTouchTime = 0; // Prevent duplicate touch/mouse events
+
+      // Helper function to get touch/mouse coordinates
+      function getPointerCoords(e) {
+        if (e.touches && e.touches.length > 0) {
+          return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          // For touchend events, use changedTouches
+          return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+      }
+
+      // Mobile-specific touch feedback
+      function showTouchFeedback(x, y) {
+        const feedback = document.createElement('div');
+        feedback.style.cssText = `
+          position: fixed;
+          left: ${x - 15}px;
+          top: ${y - 15}px;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.6);
+          border: 2px solid rgba(77, 184, 255, 0.8);
+          pointer-events: none;
+          z-index: 9999;
+          animation: touchPulse 0.3s ease-out;
+        `;
+        document.body.appendChild(feedback);
+
+        setTimeout(() => {
+          if (feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+          }
+        }, 300);
+      }
+
+      // Mouse and touch start events
+      const handleStart = (e) => {
+        // Only prevent default for touch events to avoid interfering with mouse
+        if (e.type.startsWith('touch')) {
+          e.preventDefault();
+        }
+
+        isDragging = true;
+        hasMoved = false;
+        isRotating = false;
+        const coords = getPointerCoords(e);
+        startMouse = { x: coords.x, y: coords.y };
+        lastMouse = { x: coords.x, y: coords.y };
+
+        // Show touch feedback on mobile
+        if (e.type.startsWith('touch')) {
+          showTouchFeedback(coords.x, coords.y);
+        }
+
+        canvas.style.cursor = 'pointer';
+      };
+
+      // Mouse and touch move events
+      const handleMove = (e) => {
+        if (!isDragging || isRotating) return;
+
+        // Only prevent default for touch events and only if we're dragging
+        if (e.type.startsWith('touch') && isDragging) {
+          e.preventDefault();
+        }
+
+        // Manual cube rotation is disabled
+        // Users can only paint faces, not rotate the cube by dragging
+
+        // Mark that we've moved (this will prevent painting on touch end)
+        const coords = getPointerCoords(e);
+        const deltaX = Math.abs(coords.x - startMouse.x);
+        const deltaY = Math.abs(coords.y - startMouse.y);
+
+        // If moved more than 5 pixels, consider it a drag (not a tap/click)
+        if (deltaX > 5 || deltaY > 5) {
+          hasMoved = true;
+        }
+      };
+
+      // Mouse and touch end events
+      const handleEnd = (e) => {
+        // Prevent duplicate events (touch events trigger mouse events on mobile)
+        const currentTime = Date.now();
+        if (currentTime - lastTouchTime < 100) {
+          return; // Ignore if another event fired recently
+        }
+        lastTouchTime = currentTime;
+
+        if (!hasMoved) {
+          const coords = getPointerCoords(e);
+          const rect = canvas.getBoundingClientRect();
+          mouse.x = ((coords.x - rect.left) / rect.width) * 2 - 1;
+          mouse.y = -((coords.y - rect.top) / rect.height) * 2 + 1;
+
+          raycaster.setFromCamera(mouse, world.camera);
+
+          // Check intersections with edges (faces) - only paint if ON the cube
+          const intersects = raycaster.intersectObjects(cube.edges);
+          if (intersects.length > 0) {
+            // Validate the intersection to ensure it's a valid face click
+            // Set this to false to disable validation temporarily
+            const enableValidation = true;
+
+            if (!enableValidation || validateIntersection(intersects[0], coords.x, coords.y)) {
+              paintFace(intersects[0]);
+            } else {
+              console.log('Click validation failed - click ignored');
+            }
+          }
+        }
+
+        isDragging = false;
+        hasMoved = false;
+        canvas.style.cursor = 'pointer';
+      };
+
+      // Add mouse events
+      canvas.addEventListener('mousedown', handleStart);
+      canvas.addEventListener('mousemove', handleMove);
+      canvas.addEventListener('mouseup', handleEnd);
+      canvas.addEventListener('mouseleave', () => {
+        isDragging = false;
+        hasMoved = false;
+        canvas.style.cursor = 'pointer';
+      });
+
+      // Add touch events
+      canvas.addEventListener('touchstart', handleStart, { passive: false });
+      canvas.addEventListener('touchmove', handleMove, { passive: false });
+      canvas.addEventListener('touchend', handleEnd, { passive: false });
+      canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+
+      // Initial cursor
+      canvas.style.cursor = 'pointer';
+
+
+    }
+
+    // Determine rotation direction based on screen position and drag direction (6 directions)
+    // Based on cube face numbering: 1=top-left, 2=top-right, 3=right, 4=bottom, 5=bottom-left, 6=left
+    function getRotationDirection(startX, startY, deltaX, deltaY) {
+      const absDeltaX = Math.abs(deltaX);
+      const absDeltaY = Math.abs(deltaY);
+      // Horizontal drag => Y-axis rotation, Vertical drag => X-axis rotation, Diagonal => Z-axis rotation
+      if (absDeltaX > absDeltaY) {
+        return deltaX > 0 ? 'clockwiseY' : 'counterClockwiseY';
+      } else if (absDeltaY > absDeltaX) {
+        return deltaY > 0 ? 'clockwiseX' : 'counterClockwiseX';
+      } else {
+        return deltaX > 0 ? 'clockwiseZ' : 'counterClockwiseZ';
+      }
+    }
+
+    // Quaternion-based animation for smooth axis-angle rotations
+    function animateQuaternion(startQuat, endQuat, duration, onComplete) {
+      const startTime = performance.now();
+      function animate() {
+        const now = performance.now();
+        const elapsed = now - startTime;
+        const t = Math.min(elapsed / duration, 1);
+        THREE.Quaternion.slerp(startQuat, endQuat, cube.holder.quaternion, t);
+        cube.holder.quaternion.normalize();
+        if (t < 1) {
+          requestAnimationFrame(animate);
+        } else if (onComplete) {
+          onComplete();
+        }
+      }
+      animate();
+    }
+
+    // Enhanced rotateCube90 using quaternion-based rotation system
+    // Supports local, world, body, and view rotation intents
+    function rotateCube90(direction, onComplete, rotationType = 'world') {
+      // Get current vertex positions
+      const currentVertices = VertexTracker.getAllCurrentPositions();
+
+      console.log(`=== ROTATION REQUEST: ${direction} (${rotationType.toUpperCase()}) ===`);
+      console.log('Current vertex positions:', currentVertices);
+
+      // Define rotation axes and angles for each button
+      let axis, angle;
+      const PI_2 = Math.PI / 2;
+
+      // Always define axes in WORLD coordinates first
+      switch (direction) {
+        case 'up':
+          // Button 1 - +90° X-axis rotation
+          console.log('CASE: Button 1 (UP) pressed - +90° X-axis rotation');
+          axis = new THREE.Vector3(1, 0, 0);  // World X-axis
+          angle = PI_2;
+          break;
+
+        case 'clockwiseZ':
+          // Button 2 - -90° X-axis rotation  
+          console.log('CASE: Button 2 (CLOCKWISE Z) pressed - -90° X-axis rotation');
+          axis = new THREE.Vector3(1, 0, 0);  // World X-axis
+          angle = -PI_2;
+          break;
+
+        case 'right':
+          // Button 3 - +90° Y-axis rotation
+          console.log('CASE: Button 3 (RIGHT) pressed - +90° Y-axis rotation');
+          axis = new THREE.Vector3(0, 1, 0);  // World Y-axis
+          angle = PI_2;
+          break;
+
+        case 'down':
+          // Button 4 - -90° Y-axis rotation
+          console.log('CASE: Button 4 (DOWN) pressed - -90° Y-axis rotation');
+          axis = new THREE.Vector3(0, 1, 0);  // World Y-axis
+          angle = -PI_2;
+          break;
+
+        case 'counterClockwiseZ':
+          // Button 5 - +90° Z-axis rotation
+          console.log('CASE: Button 5 (COUNTER-CLOCKWISE Z) pressed - +90° Z-axis rotation');
+          axis = new THREE.Vector3(0, 0, 1);  // World Z-axis
+          angle = PI_2;
+          break;
+
+        case 'left':
+          // Button 6 - -90° Z-axis rotation
+          console.log('CASE: Button 6 (LEFT) pressed - -90° Z-axis rotation');
+          axis = new THREE.Vector3(0, 0, 1);  // World Z-axis
+          angle = -PI_2;
+          break;
+
+        // Legacy support for drag rotations
+        case 'clockwiseY':
+          axis = new THREE.Vector3(0, 1, 0);
+          angle = PI_2;
+          break;
+        case 'counterClockwiseY':
+          axis = new THREE.Vector3(0, 1, 0);
+          angle = -PI_2;
+          break;
+        case 'clockwiseX':
+          axis = new THREE.Vector3(1, 0, 0);
+          angle = PI_2;
+          break;
+        case 'counterClockwiseX':
+          axis = new THREE.Vector3(1, 0, 0);
+          angle = -PI_2;
+          break;
+
+        default:
+          console.warn(`Unknown rotation direction: ${direction}`);
+          return;
+      }
+
+      // Apply rotation based on intent
+      console.log(`=== APPLYING ${rotationType.toUpperCase()} ROTATION ===`);
+      console.log(`World axis: (${axis.x}, ${axis.y}, ${axis.z}), Angle: ${angle * 180 / Math.PI}°`);
+
+      switch (rotationType) {
+        case 'local':
+        case 'world':
+          // Both local and world now use world axes for consistent behavior
+          // This fixes the "direction mixing" issue
+          console.log('Using WORLD axes for consistent rotation direction');
+          VertexTracker.applyWorldRotation(axis, angle);
+          break;
+
+        case 'body':
+          // True body rotation: convert world axis to current local axis
+          console.log('Converting world axis to current body axis');
+          const localAxis = axis.clone();
+
+          // Convert world axis to current local axis by applying inverse of current orientation
+          const inverseQuat = VertexTracker.orientationQuaternion.clone().invert();
+          localAxis.applyQuaternion(inverseQuat);
+
+          console.log(`Local body axis: (${localAxis.x.toFixed(3)}, ${localAxis.y.toFixed(3)}, ${localAxis.z.toFixed(3)})`);
+          VertexTracker.applyLocalRotation(localAxis, angle);
+          break;
+
+        case 'view':
+          if (world && world.camera) {
+            VertexTracker.applyViewRotation(axis, angle, world.camera);
+          } else {
+            console.warn('Camera not available for view rotation, falling back to world');
+            VertexTracker.applyWorldRotation(axis, angle);
+          }
+          break;
+
+        default:
+          console.warn(`Unknown rotation type: ${rotationType}, using world`);
+          VertexTracker.applyWorldRotation(axis, angle);
+      }
+
+      // Validate quaternion integrity
+      VertexTracker.validateQuaternion();
+
+      // Show current local axes
+      const axes = VertexTracker.getLocalAxes();
+      console.log('Current local axes:');
+      console.log('Local X-axis:', axes.localX.toArray().map(x => x.toFixed(3)));
+      console.log('Local Y-axis:', axes.localY.toArray().map(x => x.toFixed(3)));
+      console.log('Local Z-axis:', axes.localZ.toArray().map(x => x.toFixed(3)));
+
+      // Visual animation using the same quaternion
+      const startQuat = cube.holder.quaternion.clone();
+      const endQuat = VertexTracker.orientationQuaternion.clone();
+
+      // Custom completion callback
+      const customOnComplete = () => {
+        console.log(`=== ROTATION COMPLETED: ${direction} (${rotationType.toUpperCase()}) ===`);
+        VertexTracker.showAllVertices();
+
+        if (onComplete) {
+          onComplete();
+        }
+      };
+
+      // Animate to the target transformation
+      animateQuaternion(startQuat, endQuat, 200, customOnComplete);
+    }
+
+    function setupCameraControls() {
+      // Setup FOV range control like main game
+      const fovRange = new Range('fov', {
+        value: world.fov, // Use world.fov, not camera.fov
+        range: [2, 45],
+        onUpdate: (value) => {
+          world.fov = value; // Update world.fov
+          world.resize(); // Call resize to recalculate camera position
+
+        },
+        onComplete: (value) => {
+
+        }
+      });
+
+      // Setup distance range control
+      const distanceRange = new Range('distance', {
+        value: world.distanceMultiplier,
+        range: [0.3, 1.5], // Range from close to far
+        step: 0.01,
+        onUpdate: (value) => {
+          world.distanceMultiplier = value;
+          world.resize(); // Recalculate camera position
+
+        },
+        onComplete: (value) => {
+
+        }
+      });
+
+
+    }
+
+    // Toast notification function
+    function showToast(message, type = 'error', duration = 3000) {
+      // Create new toast
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+
+      // Position multiple toasts vertically
+      const existingToasts = document.querySelectorAll('.toast');
+      let topOffset = 20;
+      existingToasts.forEach((existingToast, index) => {
+        topOffset += (existingToast.offsetHeight + 10);
+      });
+
+      toast.style.top = `${topOffset}px`;
+
+      // Add to page
+      document.body.appendChild(toast);
+
+      // Show with animation
+      setTimeout(() => {
+        toast.classList.add('show');
+      }, 100);
+
+      // Hide after duration
+      setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+            // Reposition remaining toasts
+            repositionToasts();
+          }
+        }, 300);
+      }, duration);
+    }
+
+    // Reposition remaining toasts after one is removed
+    function repositionToasts() {
+      const toasts = document.querySelectorAll('.toast.show');
+      let topOffset = 20;
+      toasts.forEach((toast, index) => {
+        toast.style.top = `${topOffset}px`;
+        topOffset += (toast.offsetHeight + 10);
+      });
+    }
+
+    // Rotation cooldown functions
+    function setRotationCooldown() {
+      if (rotationCooldownActive) return false; // Already in cooldown
+
+      rotationCooldownActive = true;
+
+      // Disable all rotation buttons
+      const rotationButtons = document.querySelectorAll('.rotation-button');
+      rotationButtons.forEach(btn => {
+        btn.classList.add('disabled');
+        btn.disabled = true;
+      });
+
+      // Re-enable after cooldown period
+      setTimeout(() => {
+        rotationCooldownActive = false;
+        rotationButtons.forEach(btn => {
+          btn.classList.remove('disabled');
+          btn.disabled = false;
+        });
+      }, ROTATION_COOLDOWN_MS);
+
+      return true; // Cooldown set successfully
+    }
+
+    // Count how many times each color appears on the cube
+    function countColors() {
+      if (!cube || !cube.edges) return {};
+
+      const colorCounts = {
+        'U': 0, // White
+        'R': 0, // Red  
+        'F': 0, // Green
+        'D': 0, // Yellow
+        'L': 0, // Orange
+        'B': 0  // Blue
+      };
+
+      cube.edges.forEach(edge => {
+        const color = edge.material.color.getHex();
+
+        // Map hex colors back to color codes
+        switch (color) {
+          // User-applied colors (from updated colorMap)
+          case 0xffffff: colorCounts['U']++; break; // White
+          case 0xef3923: colorCounts['R']++; break; // Red
+          case 0x82ca38: colorCounts['F']++; break; // Green
+          case 0xffef48: colorCounts['D']++; break; // Yellow
+          case 0xff8c0a: colorCounts['L']++; break; // Orange
+          case 0x41aac8: colorCounts['B']++; break; // Blue
+
+          // Note: Center pieces use the same colors as user-applied colors now,
+          // so they're already counted in the cases above
+        }
+      });
+
+      return colorCounts;
+    }
+
+    // Check if cube is completely colored (all 54 pieces have valid colors)
+    function isCubeComplete() {
+      const colorCounts = countColors();
+
+      // Check if each color has exactly 9 pieces
+      const requiredColors = ['U', 'R', 'F', 'D', 'L', 'B'];
+      for (const color of requiredColors) {
+        if (colorCounts[color] !== 9) {
+          return false;
+        }
+      }
+
+      // Also check total count (should be 54 total pieces)
+      const totalPieces = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+      return totalPieces === 54;
+    }
+
+    // Update Smart button visibility and appearance based on cube completion
+    function updateContinueButton() {
+      // Function kept for compatibility but no longer updates smart button
+      updateSolveButton();
+    }
+
+    // Update solve button visibility based on cube completion
+    function updateSolveButton() {
+      const solveSection = document.getElementById('solveSection');
+      if (!solveSection) return;
+
+      // Check if cube is fully colored (all 54 pieces with correct color distribution)
+      const colorCounts = countColors();
+      const isComplete = isCubeComplete();
+      const cubeState = getCubeStateString();
+
+      // Detailed debug logging
+      console.log('=== UPDATE SOLVE BUTTON DEBUG ===');
+      console.log('Color counts:', colorCounts);
+      console.log('Total pieces colored:', Object.values(colorCounts).reduce((sum, count) => sum + count, 0));
+      console.log('Cube complete:', isComplete);
+      console.log('Cube state length:', cubeState ? cubeState.length : 'no state');
+      console.log('Cube state preview:', cubeState ? cubeState.substring(0, 20) + '...' : 'no state');
+
+      // Check for specific issues
+      const totalPieces = Object.values(colorCounts).reduce((sum, count) => sum + count, 0);
+      if (totalPieces !== 54) {
+        console.log(`❌ Missing pieces: expected 54, got ${totalPieces}`);
+      }
+
+      const requiredColors = ['U', 'R', 'F', 'D', 'L', 'B'];
+      for (const color of requiredColors) {
+        if (colorCounts[color] !== 9) {
+          console.log(`❌ Wrong count for ${color}: expected 9, got ${colorCounts[color]}`);
+        }
+      }
+
+      // Show solve button only when cube is complete
+      if (isComplete) {
+        solveSection.style.display = 'block';
+        console.log('✅ Solve button shown - cube is complete');
+      } else {
+        solveSection.style.display = 'none';
+        console.log('❌ Solve button hidden - cube is not complete');
+      }
+      console.log('=== END DEBUG ===');
+    }
+
+    // Get color name for display
+    function getColorName(colorCode) {
+      const colorNames = {
+        'U': 'White',
+        'R': 'Red',
+        'F': 'Green',
+        'D': 'Yellow',
+        'L': 'Orange',
+        'B': 'Blue'
+      };
+      return colorNames[colorCode] || colorCode;
+    }
+
+    // Current mode: 'color' for coloring, 'remove' for removing colors
+    let currentMode = 'color';
+
+    function setupColorPalette() {
+      const colorOptions = document.querySelectorAll('.color-option');
+      colorOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          // Remove previous selection
+          colorOptions.forEach(opt => opt.classList.remove('selected'));
+          document.getElementById('removeButton').classList.remove('active');
+
+          // Select current color
+          option.classList.add('selected');
+          selectedColor = option.dataset.color;
+          currentMode = 'color';
+
+          // Color selection is now visually indicated by the 'selected' class
+
+        });
+      });
+
+      // Reset button
+      const resetButton = document.getElementById('resetButton');
+      resetButton.addEventListener('click', () => {
+        // Reset all cube pieces to default color
+        if (cube && cube.edges) {
+          cube.edges.forEach(edge => {
+            if (edge.name !== 'core' && !cube.isCenterPiece(edge)) {
+              edge.material.color.setHex(0x222222); // Default black color
+            }
+          });
+        }
+
+        // Update continue button visibility
+        updateContinueButton();
+
+        // Show success toast
+        showToast('Cube reset successfully! All colors removed.', 'success', 2000);
+      });
+
+      // Remove color button
+      const removeButton = document.getElementById('removeButton');
+      removeButton.addEventListener('click', () => {
+        // Remove selection from color options
+        colorOptions.forEach(opt => opt.classList.remove('selected'));
+
+        // Toggle remove mode
+        if (currentMode === 'remove') {
+          // Exit remove mode
+          removeButton.classList.remove('active');
+          currentMode = 'color';
+          // Re-select the first color by default
+          colorOptions[0].classList.add('selected');
+          selectedColor = colorOptions[0].dataset.color;
+          showToast('Remove mode disabled. Select a color to paint.', 'info', 2000);
+        } else {
+          // Enter remove mode
+          removeButton.classList.add('active');
+          currentMode = 'remove';
+          showToast('Remove mode enabled. Click on colored pieces to remove their color.', 'info', 3000);
+        }
+      });
+    }
+
+    function setupCameraControls() {
+      // FOV control
+      const fovSlider = document.getElementById('fovSlider');
+      const fovValue = document.getElementById('fovValue');
+
+      fovSlider.addEventListener('input', (e) => {
+        const fov = parseFloat(e.target.value);
+        fovValue.textContent = fov;
+
+        if (world) {
+          world.fov = fov;
+          world.resize();
+        }
+      });
+
+      // Distance control
+      const distanceSlider = document.getElementById('distanceSlider');
+      const distanceValue = document.getElementById('distanceValue');
+
+      distanceSlider.addEventListener('input', (e) => {
+        const distance = parseFloat(e.target.value);
+        distanceValue.textContent = distance.toFixed(1);
+
+        if (world) {
+          world.distanceMultiplier = distance;
+          world.resize();
+        }
+      });
+    }
+
+    function setupContinueButton() {
+      const continueBtn = document.getElementById('continueBtn');
+      if (continueBtn) {
+        continueBtn.addEventListener('click', () => {
+          // Get cube state string
+          const cubeState = getCubeStateString();
+
+          // Show success message
+          showToast("🎉 Congratulations! Cube completed successfully!", "success", 4000);
+
+          // Console log the cube state
+          console.log('=== CUBE STATE EXTRACTED ===');
+          console.log('Cube State String:', cubeState);
+          console.log('Format: UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB');
+          console.log('Length:', cubeState.length, '(should be 54)');
+
+          // Optional: Copy to clipboard
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(cubeState).then(() => {
+              setTimeout(() => {
+                showToast("📋 Cube state copied to clipboard!", "info", 2500);
+              }, 1000);
+            });
+          }
+        });
+      }
+    }
+
+    // Extract cube state as standard notation string
+    function getCubeStateString() {
+      if (!cube || !cube.edges) {
+        console.error('Cube not available');
+        return '';
+      }
+
+      // Map hex colors to face letters
+      const hexToFace = {
+        0xffffff: 'U', // White -> U (Up)
+        0xef3923: 'R', // Red -> R (Right)  
+        0x82ca38: 'F', // Green -> F (Front)
+        0xffef48: 'D', // Yellow -> D (Down)
+        0xff8c0a: 'L', // Orange -> L (Left)
+        0x41aac8: 'B', // Blue -> B (Back)
+      };
+
+      // Organize pieces by their actual face names
+      const faces = {
+        U: [], // Up face (White)
+        R: [], // Right face (Red)
+        F: [], // Front face (Green) 
+        D: [], // Down face (Yellow)
+        L: [], // Left face (Orange)
+        B: []  // Back face (Blue)
+      };
+
+      // Extract colors from each piece using their face assignment
+      cube.edges.forEach((edge, index) => {
+        const color = edge.material.color.getHex();
+        const faceLetter = hexToFace[color] || 'X'; // 'X' for unknown colors
+
+        // Use the edge's face name to determine which face it belongs to
+        if (edge.name && faces[edge.name]) {
+          faces[edge.name].push(faceLetter);
+        } else {
+          // Fallback: try to determine face from edge position or properties
+          console.warn(`Edge ${index} has unknown face name:`, edge.name);
+        }
+      });
+
+      // Ensure each face has exactly 9 pieces
+      Object.keys(faces).forEach(faceName => {
+        if (faces[faceName].length !== 9) {
+          console.warn(`Face ${faceName} has ${faces[faceName].length} pieces instead of 9`);
+        }
+      });
+
+      // Check for invalid characters before building string
+      let hasInvalidColors = false;
+      Object.keys(faces).forEach(faceName => {
+        faces[faceName].forEach(color => {
+          if (color === 'X') {
+            hasInvalidColors = true;
+            console.warn(`Found uncolored piece on face ${faceName}`);
+          }
+        });
+      });
+
+      if (hasInvalidColors) {
+        console.error('Cube has uncolored pieces - cannot generate valid state string');
+        return '';
+      }
+
+      // Build the standard cube notation string: UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB
+      let stateString = '';
+      stateString += faces.U.join(''); // 9 U pieces
+      stateString += faces.R.join(''); // 9 R pieces  
+      stateString += faces.F.join(''); // 9 F pieces
+      stateString += faces.D.join(''); // 9 D pieces
+      stateString += faces.L.join(''); // 9 L pieces
+      stateString += faces.B.join(''); // 9 B pieces
+
+      // Debug output
+      console.log('Face breakdown:');
+      Object.keys(faces).forEach(faceName => {
+        console.log(`${faceName}: ${faces[faceName].join('')} (${faces[faceName].length} pieces)`);
+      });
+
+      return stateString;
+    }
+
+    // Convert our cube state and get solving steps from Flask backend
+    async function solveCubeWithCubeJS() {
+      console.log('🎯 Solve button clicked!');
+
+      try {
+        // Get current cube state
+        const cubeState = getCubeStateString();
+        console.log('Cube state:', cubeState);
+        console.log('Cube state length:', cubeState ? cubeState.length : 'no state');
+
+        if (!cubeState || cubeState.length !== 54) {
+          console.log('❌ Invalid cube state');
+          showToast('Invalid cube state! Make sure all 54 pieces are colored correctly.', 'error', 4000);
+          return;
+        }
+
+        // Check for invalid characters
+        if (cubeState.includes('X')) {
+          console.log('❌ Cube has uncolored pieces');
+          showToast('Complete all colors first! Some pieces are still uncolored (black).', 'error', 4000);
+          return;
+        }
+
+        // Validate color distribution
+        const colorCounts = {};
+        'URFDLB'.split('').forEach(color => {
+          colorCounts[color] = (cubeState.match(new RegExp(color, 'g')) || []).length;
+        });
+        
+        console.log('Color distribution:', colorCounts);
+        
+        const invalidColors = Object.keys(colorCounts).filter(color => colorCounts[color] !== 9);
+        if (invalidColors.length > 0) {
+          console.log('❌ Invalid color distribution:', colorCounts);
+          showToast(`Invalid color distribution! Each color needs exactly 9 pieces. Issues: ${invalidColors.map(c => `${c}:${colorCounts[c]}`).join(', ')}`, 'error', 5000);
+          return;
+        }
+
+        // Check if cube is complete (already solved) - TEMPORARILY DISABLED FOR TESTING
+        // if (isCubeComplete()) {
+        //   console.log('✅ Cube is already complete');
+        //   showToast('🎉 Cube is already solved! Great job!', 'success', 3000);
+        //   return;
+        // }
+
+        console.log('📡 Making API call to Flask backend...');
+        showToast('🔍 Analyzing cube with AI solver...', 'info', 2000);
+
+        // Call Flask backend API
+        try {
+          const response = await fetch('http://localhost:5000/solve', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              cube: cubeState
+            })
+          });
+
+          const result = await response.json();
+
+          if (response.ok && result.solution) {
+            // Check if cube is already solved (empty solution)
+            if (!result.solution || result.solution.trim() === '') {
+              showToast('🎉 Cube is already in solved state!', 'success', 3000);
+            } else {
+              // Display the solution
+              const moves = result.solution.split(' ').filter(move => move.trim() !== '');
+              displaySolution(moves);
+              showToast(`✅ Solution found! ${moves.length} moves needed.`, 'success', 3000);
+
+              // Log solution details
+              console.log('Solution details:', result);
+            }
+          } else {
+            // Handle API errors
+            console.log('API Error Response:', result);
+            
+            if (result.error) {
+              showToast(`❌ Solver error: ${result.error}`, 'error', 4000);
+            } else {
+              showToast('❌ Unknown error occurred', 'error', 4000);
+            }
+
+            // Fallback: Show cube state for manual solving
+            showCubeStateForManualSolving(cubeState);
+          }
+
+        } catch (networkError) {
+          console.error('Network error:', networkError);
+
+          // Check if Flask server is running
+          if (networkError.message.includes('fetch')) {
+            showToast('❌ Cannot connect to solver server. Make sure Flask backend is running on localhost:5000', 'error', 5000);
+          } else {
+            showToast('❌ Network error: ' + networkError.message, 'error', 4000);
+          }
+
+          // Fallback: Show cube state for manual solving
+          showCubeStateForManualSolving(cubeState);
+        }
+
+      } catch (error) {
+        console.error('Cube solver error:', error);
+        showToast('❌ Error with cube solver: ' + error.message, 'error', 4000);
+
+        // Fallback: Show cube state for manual solving  
+        const cubeState = getCubeStateString();
+        if (cubeState) {
+          showCubeStateForManualSolving(cubeState);
+        }
+      }
+    }
+
+    // Show cube state for manual solving when automatic solving fails
+    function showCubeStateForManualSolving(cubeState) {
+      displaySolution(['Manual solving required']);
+
+      // Create detailed cube state display
+      let solutionPanel = document.getElementById('solutionPanel');
+      if (!solutionPanel) {
+        solutionPanel = document.createElement('div');
+        solutionPanel.id = 'solutionPanel';
+        solutionPanel.className = 'solution-panel';
+        document.querySelector('.controls-panel').appendChild(solutionPanel);
+      }
+
+      solutionPanel.innerHTML = `
+        <div class="section">
+          <h2>🧩 Cube Configuration</h2>
+          <div class="solution-info">
+            <p><strong>Cube State String:</strong></p>
+            <div class="solution-moves">${cubeState}</div>
+            <p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">
+              <strong>Format:</strong> 54 characters representing each face:<br>
+              U(9) + R(9) + F(9) + D(9) + L(9) + B(9) = 54 pieces
+            </p>
+            <div class="solution-controls">
+              <button class="btn" onclick="copySolution('${cubeState}')">📋 Copy State</button>
+              <button class="btn" onclick="openOnlineSolver('${cubeState}')">🌐 Online Solver</button>
+              <button class="btn" onclick="clearSolution()">❌ Clear</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      showToast('Cube state extracted! Use online solver for step-by-step solution.', 'info', 4000);
+    }
+
+    // Open online solver with cube state
+    function openOnlineSolver(cubeState) {
+      // Open a popular online cube solver with the state
+      const url = `https://cubedb.net/?puzzle=3&alg=&input=${encodeURIComponent(cubeState)}`;
+      window.open(url, '_blank');
+      showToast('Opening online solver in new tab...', 'info', 2000);
+    }
+
+    // Display completion information
+    function displayCompletionInfo(cubeState) {
+      let solutionPanel = document.getElementById('solutionPanel');
+      if (!solutionPanel) {
+        solutionPanel = document.createElement('div');
+        solutionPanel.id = 'solutionPanel';
+        solutionPanel.className = 'solution-panel';
+        document.querySelector('.controls-panel').appendChild(solutionPanel);
+      }
+
+      solutionPanel.innerHTML = `
+        <div class="section">
+          <h2>🎉 Cube Completed!</h2>
+          <div class="solution-info">
+            <p><strong>Status:</strong> ✅ Perfectly Solved</p>
+            <p><strong>Configuration:</strong></p>
+            <div class="solution-moves">${cubeState}</div>
+            <p style="font-size: 12px; opacity: 0.8; margin-top: 10px;">
+              All faces have exactly 9 pieces of the correct color!
+            </p>
+            <div class="solution-controls">
+              <button class="btn" onclick="copySolution('${cubeState}')">📋 Copy State</button>
+              <button class="btn success" onclick="resetAndContinue()">🔄 New Puzzle</button>
+              <button class="btn" onclick="clearSolution()">❌ Clear</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Reset cube for new puzzle
+    function resetAndContinue() {
+      // Reset all cube pieces to default color
+      if (cube && cube.edges) {
+        cube.edges.forEach(edge => {
+          if (edge.name !== 'core' && !cube.isCenterPiece(edge)) {
+            edge.material.color.setHex(0x222222); // Default black color
+          }
+        });
+      }
+
+      // Clear solution panel
+      clearSolution();
+
+      showToast('Cube reset! Start a new puzzle configuration.', 'success', 2000);
+    }
+
+    // Display help for invalid cube configuration
+    function displayInvalidCubeHelp(cubeState) {
+      let solutionPanel = document.getElementById('solutionPanel');
+      if (!solutionPanel) {
+        solutionPanel = document.createElement('div');
+        solutionPanel.id = 'solutionPanel';
+        solutionPanel.className = 'solution-panel';
+        document.querySelector('.controls-panel').appendChild(solutionPanel);
+      }
+
+      solutionPanel.innerHTML = `
+        <div class="section">
+          <h2>⚠️ Invalid Cube Configuration</h2>
+          <div class="solution-info">
+            <p><strong>Problem:</strong> The current cube state represents an impossible configuration.</p>
+            <p><strong>Why this happens:</strong></p>
+            <ul>
+              <li>Colors were placed manually without following cube constraints</li>
+              <li>The cube pieces are in physically impossible positions</li>
+              <li>Random coloring doesn't create a valid solvable cube</li>
+            </ul>
+            <p><strong>Solutions:</strong></p>
+            <div class="solution-controls">
+              <button class="btn" onclick="loadValidScrambledState()">🎲 Load Valid Scrambled Cube</button>
+              <button class="btn" onclick="resetToSolvedState()">✅ Reset to Solved State</button>
+              <button class="btn" onclick="showValidStateExamples()">📚 Show Valid Examples</button>
+              <button class="btn" onclick="clearSolution()">❌ Close</button>
+            </div>
+            <p><strong>Current State (for reference):</strong></p>
+            <div class="solution-moves" style="font-size: 10px; word-break: break-all;">${cubeState}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Display the solution steps
+    function displaySolution(solution) {
+      // Create or update solution display area
+      let solutionPanel = document.getElementById('solutionPanel');
+      if (!solutionPanel) {
+        solutionPanel = document.createElement('div');
+        solutionPanel.id = 'solutionPanel';
+        solutionPanel.className = 'solution-panel';
+        document.querySelector('.controls-panel').appendChild(solutionPanel);
+      }
+
+      solutionPanel.innerHTML = `
+        <div class="section">
+          <h2>🧩 Solution Steps</h2>
+          <div class="solution-info">
+            <p><strong>Moves needed:</strong> ${solution.length}</p>
+            <p><strong>Algorithm:</strong></p>
+            <div class="solution-moves">${solution.join(' ')}</div>
+            <div class="solution-controls">
+              <button class="btn" onclick="copySolution('${solution.join(' ')}')">📋 Copy Solution</button>
+              <button class="btn" onclick="clearSolution()">❌ Clear</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Copy solution to clipboard
+    function copySolution(solution) {
+      navigator.clipboard.writeText(solution).then(() => {
+        showToast('Solution copied to clipboard!', 'success', 2000);
+      }).catch(() => {
+        showToast('Failed to copy solution', 'error', 2000);
+      });
+    }
+
+    // Clear solution display
+    function clearSolution() {
+      const solutionPanel = document.getElementById('solutionPanel');
+      if (solutionPanel) {
+        solutionPanel.remove();
+      }
+    }
+
+    // Mobile-friendly animation function for cube piece feedback
+    function animatePieceScale(edge, scaleFactor = 1.2, duration = 200) {
+      if (!edge || !edge.scale) return;
+
+      // First, reset ALL pieces to normal scale to prevent multiple scaled pieces
+      scene.traverse((child) => {
+        if (child.scale && (child.scale.x !== 1 || child.scale.y !== 1 || child.scale.z !== 1)) {
+          child.scale.set(1, 1, 1);
+        }
+      });
+
+      // Store reference to the edge for cleanup
+      const originalScale = { x: 1, y: 1, z: 1 }; // Always reset to exactly 1,1,1
+
+      // Scale up the piece
+      edge.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+      // Multiple reset attempts for maximum mobile compatibility
+
+      // Reset 1: Normal timing
+      setTimeout(() => {
+        if (edge && edge.scale) {
+          edge.scale.set(originalScale.x, originalScale.y, originalScale.z);
+        }
+      }, duration);
+
+      // Reset 2: Quick fallback
+      setTimeout(() => {
+        if (edge && edge.scale) {
+          edge.scale.set(1, 1, 1);
+        }
+      }, duration + 50);
+
+      // Reset 3: Mobile fallback 
+      setTimeout(() => {
+        if (edge && edge.scale) {
+          edge.scale.set(1, 1, 1);
+          console.log('Mobile scale reset applied');
+        }
+      }, duration * 2);
+
+      // Reset 4: Emergency fallback for problematic devices
+      setTimeout(() => {
+        if (edge && edge.scale) {
+          // Force reset regardless of current state
+          edge.scale.x = 1;
+          edge.scale.y = 1;
+          edge.scale.z = 1;
+          console.log('Emergency scale reset applied');
+        }
+      }, duration * 3);
+    }
+
+    // Validate intersection to ensure click is on a cube face, not edges/gaps
+    function validateIntersection(intersection, screenX, screenY) {
+      if (!intersection || !intersection.object) {
+        console.log('Click rejected: no intersection or object');
+        return false;
+      }
+
+      const edge = intersection.object;
+      const point = intersection.point;
+
+      // Check if we have a valid face normal
+      if (!intersection.face || !intersection.face.normal) {
+        console.log('Click rejected: no valid face normal');
+        return false;
+      }
+
+      // Convert intersection point to local coordinates relative to the cube piece
+      const localPoint = edge.worldToLocal(point.clone());
+
+      // More lenient validation - just check we're not on extreme edges
+      // Cube pieces are around 0.95 units, so allow clicks within reasonable bounds
+      const edgeTolerance = 0.45; // Allow more area for valid clicks
+
+      // Check if we're clicking too close to the edges on multiple axes
+      let edgeAxes = 0;
+      if (Math.abs(localPoint.x) > edgeTolerance) edgeAxes++;
+      if (Math.abs(localPoint.y) > edgeTolerance) edgeAxes++;
+      if (Math.abs(localPoint.z) > edgeTolerance) edgeAxes++;
+
+      // Reject only if we're on edges of multiple axes (corners/edges)
+      if (edgeAxes >= 2) {
+        console.log('Click rejected: too close to corner/edge', localPoint, 'edge axes:', edgeAxes);
+        return false;
+      }
+
+      // Additional check: ensure we're not clicking too far away
+      if (intersection.distance > 50) { // Increased from 20 to 50 to accommodate camera distance
+        console.log('Click rejected: too far away', intersection.distance);
+        return false;
+      }
+
+      console.log('Click accepted:', localPoint, 'edge axes:', edgeAxes, 'distance:', intersection.distance);
+      return true;
+    }
+
+    function paintFace(intersection) {
+      const edge = intersection.object;
+
+      // Check if this is a center piece
+      if (cube && cube.isCenterPiece(edge)) {
+        showToast("You cannot color the center pieces!", "warning", 2500);
+        return; // Don't allow coloring center pieces
+      }
+
+      // Handle remove mode
+      if (currentMode === 'remove') {
+        const currentPieceColor = edge.material.color.getHex();
+
+        // Check if piece is already uncolored (black)
+        if (currentPieceColor === 0x222222) {
+          showToast("This piece is already uncolored!", "info", 2000);
+          return;
+        }
+
+        // Remove the color (set to black)
+        edge.material.color.setHex(0x222222);
+
+        // Visual feedback animation - mobile-friendly
+        // More accurate mobile detection
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) &&
+          'ontouchstart' in window;
+
+        if (!isMobile) {
+          animatePieceScale(edge);
+        } else {
+          // Simple mobile feedback without scaling
+          const originalColor = edge.material.color.getHex();
+          edge.material.color.setHex(0xffffff); // Brief white flash
+          setTimeout(() => {
+            if (edge && edge.material) {
+              edge.material.color.setHex(0x222222); // Back to black (removed state)
+            }
+          }, 100);
+        }
+
+        updatePattern();
+
+        // Check if cube is now complete and update Continue button
+        setTimeout(() => {
+          updateContinueButton();
+        }, 300);
+
+        showToast("Color removed successfully!", "success", 1500);
+        return;
+      }
+
+      // Normal color mode below this point
+      // Check color limits before painting
+      const colorCounts = countColors();
+      const currentColorCount = colorCounts[selectedColor] || 0;
+
+      // Check what color this piece currently has
+      const currentPieceColor = edge.material.color.getHex();
+      const isUncolored = currentPieceColor === 0x222222; // 0x222222 is the default black color
+
+      // If piece already has the selected color, allow repainting (no change in count)
+      const selectedColorHex = colorMap[selectedColor];
+      if (currentPieceColor === selectedColorHex) {
+        // Same color, just repaint (no count change) - no toast needed
+        return; // Exit early, no need to repaint the same color
+      }
+      // If piece is uncolored and would exceed limit, block it
+      else if (isUncolored && currentColorCount >= 9) {
+        const colorName = getColorName(selectedColor);
+        showToast(`${colorName} color limit reached! (9 pieces max: 1 center + 8 others)`, "error", 3500);
+
+        // Show second toast after a delay suggesting to check for mistakes
+        setTimeout(() => {
+          showToast(`Check if you mistakenly placed ${colorName} elsewhere on the cube`, "info", 4000);
+        }, 1500);
+
+        return; // Don't allow painting
+      }
+      // If piece has a different color, this is recoloring (allowed - one decreases, one increases)
+      else if (!isUncolored && currentColorCount >= 9) {
+        // Check if recoloring would create a valid state
+        // We're removing one of the current color and adding one of the selected color
+        // This is allowed as long as we're not exceeding limits
+        const colorName = getColorName(selectedColor);
+        showToast(`${colorName} color limit reached! Try removing a ${colorName} piece first.`, "warning", 3000);
+        return;
+      }
+
+      const color = colorMap[selectedColor];
+
+      // Paint the face
+      edge.material.color.setHex(color);
+
+      // Visual feedback animation - mobile-friendly
+      // More accurate mobile detection
+      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) &&
+        'ontouchstart' in window;
+
+      if (!isMobile) {
+        animatePieceScale(edge);
+      } else {
+        // Simple mobile feedback without scaling - color flash
+        const targetColor = color;
+        edge.material.color.setHex(0xffffff); // Brief white flash
+        setTimeout(() => {
+          if (edge && edge.material) {
+            edge.material.color.setHex(targetColor); // Set to target color
+          }
+        }, 100);
+      }
+
+      updatePattern();
+
+      // Check if cube is now complete and update Continue button
+      setTimeout(() => {
+        updateContinueButton();
+      }, 300); // Small delay to ensure visual feedback completes first
+    }
+
+    function resetCube() {
+      if (!cube) return;
+
+      // Reset cube visual rotation
+      cube.holder.rotation.set(0, 0, 0);
+      cube.holder.quaternion.set(0, 0, 0, 1);
+
+      // Reset orientation matrix M to identity (M = I)
+      if (window.VertexTracker) {
+        VertexTracker.resetOrientation();
+      }
+
+      // Reset to black colors but keep center pieces colored
+      cube.edges.forEach(edge => {
+        if (cube.isCenterPiece(edge)) {
+          // Keep center pieces colored
+          const centerColors = {
+            U: 0xffffff, // white
+            D: 0xffef48, // yellow
+            F: 0xef3923, // red
+            R: 0x41aac8, // blue
+            B: 0xff8c0a, // orange
+            L: 0x82ca38, // green
+          };
+          edge.material.color.setHex(centerColors[edge.name] || 0x222222);
+        } else {
+          // Reset other pieces to black
+          edge.material.color.setHex(0x222222);
+        }
+      });
+
+      console.log('=== CUBE RESET COMPLETE ===');
+      console.log('Visual rotation and orientation quaternion reset to identity');
+
+      updatePattern();
+    }
+
+    function scrambleCube() {
+      if (!cube) return;
+
+      const colors = Object.values(colorMap);
+      cube.edges.forEach(edge => {
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        edge.material.color.setHex(randomColor);
+      });
+
+
+      updatePattern();
+    }
+
+    function saveCube() {
+      if (!cube) return;
+
+      const state = extractCubeState();
+      localStorage.setItem('cubeEditorState', JSON.stringify(state));
+      alert('✅ Cube state saved successfully!');
+    }
+
+    function loadCube() {
+      if (!cube) return;
+
+      const saved = localStorage.getItem('cubeEditorState');
+      if (saved) {
+        try {
+          const state = JSON.parse(saved);
+          applyCubeState(state);
+          alert('✅ Cube state loaded successfully!');
+          updatePattern();
+        } catch (error) {
+          alert('❌ Error loading cube state: ' + error.message);
+        }
+      } else {
+        alert('ℹ️ No saved state found!');
+      }
+    }
+
+    function setView(view) {
+      if (!world) return;
+
+      const positions = {
+        'front': { x: 3.5, y: 2, z: 3.5 },
+        'back': { x: -3.5, y: 2, z: -3.5 },
+        'left': { x: -3.5, y: 2, z: 3.5 },
+        'right': { x: 3.5, y: 2, z: -3.5 },
+        'top': { x: 0, y: 5, z: 0 },
+        'bottom': { x: 0, y: -5, z: 0 }
+      };
+
+      const pos = positions[view];
+      if (pos) {
+        // Smooth camera transition
+        const startPos = world.camera.position.clone();
+        const targetPos = new THREE.Vector3(pos.x, pos.y, pos.z);
+
+        const duration = 500;
+        const startTime = Date.now();
+
+        function animateCamera() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+
+          // Easing function
+          const easedProgress = 1 - Math.pow(1 - progress, 3);
+
+          world.camera.position.lerpVectors(startPos, targetPos, easedProgress);
+          world.camera.lookAt(0, 0, 0);
+
+          if (progress < 1) {
+            requestAnimationFrame(animateCamera);
+          }
+        }
+
+        animateCamera();
+
+      }
+    }
+
+    function extractCubeState() {
+      return {
+        timestamp: Date.now(),
+        edges: cube.edges.map(edge => ({
+          name: edge.name,
+          color: edge.material.color.getHex(),
+          position: {
+            x: edge.position.x,
+            y: edge.position.y,
+            z: edge.position.z
+          }
+        }))
+      };
+    }
+
+    function applyCubeState(state) {
+      if (!state.edges) return;
+
+      state.edges.forEach(edgeState => {
+        const edge = cube.edges.find(e =>
+          e.name === edgeState.name &&
+          Math.abs(e.position.x - edgeState.position.x) < 0.01 &&
+          Math.abs(e.position.y - edgeState.position.y) < 0.01 &&
+          Math.abs(e.position.z - edgeState.position.z) < 0.01
+        );
+
+        if (edge) {
+          edge.material.color.setHex(edgeState.color);
+        }
+      });
+    }
+
+    // Load cube state from string notation
+    function loadCubeState(stateString) {
+      if (!cube || !cube.edges) {
+        showToast('Cube not ready! Please wait for it to load.', 'error', 3000);
+        return;
+      }
+
+      // Clean and validate input
+      stateString = stateString.trim().toUpperCase();
+
+      // Remove any spaces, dashes, or other separators
+      stateString = stateString.replace(/[\s\-_]/g, '');
+
+      // Check if it's a standard 54-character state string
+      if (stateString.length === 54 && /^[URFDLB]+$/.test(stateString)) {
+        // Validate the cube state before loading
+        if (validateCubeState(stateString)) {
+          loadFromStandardNotation(stateString);
+          showToast('Cube state loaded successfully!', 'success', 2500);
+        }
+        return;
+      }
+
+      // Check if it's scramble notation (like "R U R' D' R U' R' D")
+      if (/^[RLUDFB]['2]?\s*]+$/i.test(stateString)) {
+        showToast('Scramble notation not yet supported. Please use 54-character state string.', 'warning', 3500);
+        return;
+      }
+
+      showToast('Invalid format! Use 54-character string like: UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB', 'error', 4000);
+    }
+
+    function validateCubeState(stateString) {
+      // Count each face letter
+      const counts = { U: 0, R: 0, F: 0, D: 0, L: 0, B: 0 };
+
+      for (let i = 0; i < stateString.length; i++) {
+        const letter = stateString[i];
+        if (counts.hasOwnProperty(letter)) {
+          counts[letter]++;
+        }
+      }
+
+      // Check that each color has exactly 9 pieces
+      const colorNames = {
+        U: 'White (U)',
+        R: 'Red (R)',
+        F: 'Green (F)',
+        D: 'Yellow (D)',
+        L: 'Orange (L)',
+        B: 'Blue (B)'
+      };
+
+      for (let face in counts) {
+        if (counts[face] !== 9) {
+          showToast(`Invalid cube! ${colorNames[face]} has ${counts[face]} pieces, but needs exactly 9.`, 'error', 4000);
+          return false;
+        }
+      }
+
+      // Check center pieces (positions 4, 13, 22, 31, 40, 49 in the 54-char string)
+      const expectedCenters = {
+        4: 'U',   // U face center (position 4 in UUUUUUUUU)
+        13: 'R',  // R face center (position 13 in total string)
+        22: 'F',  // F face center (position 22 in total string)
+        31: 'D',  // D face center (position 31 in total string) 
+        40: 'L',  // L face center (position 40 in total string)
+        49: 'B'   // B face center (position 49 in total string)
+      };
+
+      for (let pos in expectedCenters) {
+        const actualCenter = stateString[pos];
+        const expectedCenter = expectedCenters[pos];
+        if (actualCenter !== expectedCenter) {
+          showToast(`Invalid center piece! ${colorNames[expectedCenter]} face center should be '${expectedCenter}' but found '${actualCenter}'.`, 'error', 4000);
+          return false;
+        }
+      }
+
+      return true;
+    }
+
+    function loadFromStandardNotation(stateString) {
+      // Map face letters to hex colors
+      const faceToHex = {
+        'U': 0xffffff, // White -> U (Up)
+        'R': 0xef3923, // Red -> R (Right)  
+        'F': 0x82ca38, // Green -> F (Front)
+        'D': 0xffef48, // Yellow -> D (Down)
+        'L': 0xff8c0a, // Orange -> L (Left)
+        'B': 0x41aac8, // Blue -> B (Back)
+      };
+
+      // Parse the 54-character string into face arrays
+      const faces = {
+        U: stateString.substring(0, 9).split(''),   // Positions 0-8
+        R: stateString.substring(9, 18).split(''),  // Positions 9-17
+        F: stateString.substring(18, 27).split(''), // Positions 18-26
+        D: stateString.substring(27, 36).split(''), // Positions 27-35
+        L: stateString.substring(36, 45).split(''), // Positions 36-44
+        B: stateString.substring(45, 54).split(''), // Positions 45-53
+      };
+
+      console.log('Loading cube state:', faces);
+
+      // Apply colors to cube pieces based on their face assignment
+      cube.edges.forEach((edge, index) => {
+        if (edge.name && faces[edge.name]) {
+          const faceArray = faces[edge.name];
+
+          // Find the position of this edge within its face
+          // For now, we'll use a simple indexing approach
+          const edgesOnFace = cube.edges.filter(e => e.name === edge.name);
+          const positionOnFace = edgesOnFace.indexOf(edge);
+
+          if (positionOnFace >= 0 && positionOnFace < faceArray.length) {
+            const faceLetter = faceArray[positionOnFace];
+            const color = faceToHex[faceLetter];
+
+            if (color !== undefined) {
+              edge.material.color.setHex(color);
+            }
+          }
+        }
+      });
+
+      // Update continue button visibility
+      updateContinueButton();
+    }
+
+    function updatePattern() {
+      if (!cube) {
+        return;
+      }
+
+      // We removed the pattern display, so just log for debugging
+
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (world && !isLoading) {
+        world.render();
+      }
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (!cube) return;
+
+      switch (e.key) {
+        case 'r':
+        case 'R':
+          resetCube();
+          e.preventDefault();
+          break;
+      }
+    });
+
+    // Initialize when page loads
+    window.addEventListener('load', () => {
+      init();
+
+      // Initial solve button state (hidden since cube starts empty)
+      updateSolveButton();
+
+      // Setup state input functionality
+      const loadStateBtn = document.getElementById('loadStateBtn');
+      const stateInput = document.getElementById('stateInput');
+
+      loadStateBtn.addEventListener('click', () => {
+        const stateString = stateInput.value.trim();
+        if (stateString) {
+          loadCubeState(stateString);
+        } else {
+          showToast('Please enter a cube state', 'warning', 2000);
+        }
+      });
+
+      // Allow Enter key to load state
+      stateInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          loadStateBtn.click();
+        }
+      });
+
+      // Set default rotation mode to world (consistent directions)
+      window.currentRotationMode = 'world';
+      console.log('Default rotation mode: WORLD (consistent directions)');
+      console.log('Available modes:');
+      console.log('- "world": Always rotate around fixed world axes (consistent directions)');
+      console.log('- "body": Rotate around cube\'s current local axes (true body rotation)');
+      console.log('- "view": Rotate relative to camera view');
+      console.log('Use setRotationMode("world"), setRotationMode("body"), or setRotationMode("view")');
+
+      // Rotation button handlers with rotation intent support and cooldown
+      document.querySelectorAll('.rotation-button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          // Check if cooldown is active
+          if (rotationCooldownActive) {
+            return; // Ignore click during cooldown
+          }
+
+          // Set cooldown before rotation
+          if (!setRotationCooldown()) {
+            return; // Failed to set cooldown (shouldn't happen)
+          }
+
+          const dir = btn.dataset.dir;
+          const rotationMode = window.currentRotationMode || 'world'; // Default to world
+          rotateCube90(dir, undefined, rotationMode);
+        });
+      });
+    });
+
+    // Debug functions for testing
+    window.debugCube = function () {
+      console.log('=== CUBE DEBUG INFO ===');
+      const cubeState = getCubeStateString();
+      console.log('Cube state:', cubeState);
+      console.log('Cube state length:', cubeState ? cubeState.length : 'no state');
+      console.log('Is cube complete:', isCubeComplete());
+
+      if (cubeState) {
+        const colorCounts = {};
+        for (let i = 0; i < cubeState.length; i++) {
+          const color = cubeState[i];
+          colorCounts[color] = (colorCounts[color] || 0) + 1;
+        }
+        console.log('Color counts:', colorCounts);
+      }
+
+      const solveSection = document.getElementById('solveSection');
+      console.log('Solve section display:', solveSection ? solveSection.style.display : 'not found');
+    };
+
+    window.testSolve = function () {
+      console.log('🧪 Testing solve function...');
+      solveCubeWithCubeJS();
+    };
+
+    // Debug functions for quaternion-based rotation system
+    window.debugCubeEditor = function () {
+      console.log('=== CUBE EDITOR DEBUG INFO ===');
+      if (VertexTracker) {
+        console.log('Current orientation quaternion q:', VertexTracker.formatQuaternion(VertexTracker.orientationQuaternion));
+        console.log('Quaternion length:', VertexTracker.orientationQuaternion.length().toFixed(6));
+
+        const euler = VertexTracker.getEulerAngles();
+        console.log('Euler angles (degrees):',
+          `X: ${euler.x.toFixed(1)}°, Y: ${euler.y.toFixed(1)}°, Z: ${euler.z.toFixed(1)}°`);
+
+        const axes = VertexTracker.getLocalAxes();
+        console.log('Local axes:');
+        console.log('X:', axes.localX.toArray().map(x => x.toFixed(3)));
+        console.log('Y:', axes.localY.toArray().map(x => x.toFixed(3)));
+        console.log('Z:', axes.localZ.toArray().map(x => x.toFixed(3)));
+
+        console.log('Current vertex positions:');
+        VertexTracker.showAllVertices();
+      }
+    };
+
+    // Test quaternion rotation with multiple intents
+    window.testQuaternionRotations = function () {
+      console.log('=== TESTING QUATERNION ROTATION SYSTEM ===');
+      console.log('Testing WORLD rotations: Right → Up → Left → Down');
+      console.log('(Should have consistent directions)');
+
+      rotateCube90('right', () => {
+        setTimeout(() => {
+          rotateCube90('up', () => {
+            setTimeout(() => {
+              rotateCube90('left', () => {
+                setTimeout(() => {
+                  rotateCube90('down', () => {
+                    console.log('=== WORLD SEQUENCE COMPLETE ===');
+                    console.log('Final quaternion should be close to identity:');
+                    console.log(VertexTracker.formatQuaternion(VertexTracker.orientationQuaternion));
+                    VertexTracker.validateQuaternion();
+                  }, undefined, 'world');
+                }, 500);
+              }, undefined, 'world');
+            }, 500);
+          }, undefined, 'world');
+        }, 500);
+      }, undefined, 'world');
+    };
+
+    // Test body rotations (true local axes)
+    window.testBodyRotations = function () {
+      console.log('=== TESTING BODY ROTATION SYSTEM ===');
+      console.log('Testing BODY rotations around cube\'s current local axes');
+
+      rotateCube90('right', () => {
+        setTimeout(() => {
+          rotateCube90('up', () => {
+            setTimeout(() => {
+              rotateCube90('left', () => {
+                setTimeout(() => {
+                  rotateCube90('down', () => {
+                    console.log('=== BODY SEQUENCE COMPLETE ===');
+                    console.log('Notice how directions change with cube orientation');
+                    VertexTracker.validateQuaternion();
+                  }, undefined, 'body');
+                }, 500);
+              }, undefined, 'body');
+            }, 500);
+          }, undefined, 'body');
+        }, 500);
+      }, undefined, 'body');
+    };
+
+    // Test world rotations
+    window.testWorldRotations = function () {
+      console.log('=== TESTING WORLD ROTATION SYSTEM ===');
+      console.log('Performing world rotations around X, Y, Z axes');
+
+      rotateCube90('up', () => {
+        setTimeout(() => {
+          rotateCube90('right', () => {
+            setTimeout(() => {
+              rotateCube90('counterClockwiseZ', () => {
+                console.log('=== WORLD ROTATION SEQUENCE COMPLETE ===');
+                VertexTracker.validateQuaternion();
+              }, undefined, 'world');
+            }, 500);
+          }, undefined, 'world');
+        }, 500);
+      }, undefined, 'world');
+    };
+
+    // Test view rotations (requires camera)
+    window.testViewRotations = function () {
+      if (!world || !world.camera) {
+        console.warn('Camera not available for view rotation testing');
+        return;
+      }
+
+      console.log('=== TESTING VIEW ROTATION SYSTEM ===');
+      console.log('Camera-relative rotations');
+
+      rotateCube90('up', () => {
+        setTimeout(() => {
+          rotateCube90('right', () => {
+            console.log('=== VIEW ROTATION SEQUENCE COMPLETE ===');
+            VertexTracker.validateQuaternion();
+          }, undefined, 'view');
+        }, 500);
+      }, undefined, 'view');
+    };
+
+    // Show current quaternion in console
+    window.showQuaternion = function () {
+      if (VertexTracker) {
+        console.log('Current orientation quaternion q:', VertexTracker.formatQuaternion(VertexTracker.orientationQuaternion));
+        VertexTracker.validateQuaternion();
+
+        const euler = VertexTracker.getEulerAngles();
+        console.log('As Euler angles:',
+          `X: ${euler.x.toFixed(1)}°, Y: ${euler.y.toFixed(1)}°, Z: ${euler.z.toFixed(1)}°`);
+      }
+    };
+
+    // Switch rotation mode for button testing
+    window.setRotationMode = function (mode) {
+      window.currentRotationMode = mode;
+      console.log(`Rotation mode set to: ${mode.toUpperCase()}`);
+      console.log('Now button clicks will use this rotation intent');
+    };
+
+    // Force resize function for debugging
+    window.forceResize = function () {
+      if (world) {
+        world.forceResize();
+      }
+    };
+
+    // Enhanced Vertex Tracking System with Quaternion-Based Rotation Support
+    // Following the quaternion method: q for orientation, local/world/view rotation intents
+    window.VertexTracker = {
+      // 8 corner vertices with unique IDs and their ORIGINAL positions
+      originalVertices: {
+        'V1': { name: 'Front-Top-Left', x: -1, y: 1, z: 1, color: 'red', description: 'Green face, White face, Orange face corner' },
+        'V2': { name: 'Front-Top-Right', x: 1, y: 1, z: 1, color: 'blue', description: 'Green face, White face, Red face corner' },
+        'V3': { name: 'Front-Bottom-Left', x: -1, y: -1, z: 1, color: 'yellow', description: 'Green face, Yellow face, Orange face corner' },
+        'V4': { name: 'Front-Bottom-Right', x: 1, y: -1, z: 1, color: 'green', description: 'Green face, Yellow face, Red face corner' },
+        'V5': { name: 'Back-Top-Left', x: -1, y: 1, z: -1, color: 'orange', description: 'Blue face, White face, Orange face corner' },
+        'V6': { name: 'Back-Top-Right', x: 1, y: 1, z: -1, color: 'purple', description: 'Blue face, White face, Red face corner' },
+        'V7': { name: 'Back-Bottom-Left', x: -1, y: -1, z: -1, color: 'cyan', description: 'Blue face, Yellow face, Orange face corner' },
+        'V8': { name: 'Back-Bottom-Right', x: 1, y: -1, z: -1, color: 'magenta', description: 'Blue face, Yellow face, Red face corner' }
+      },
+
+      // Cube's orientation quaternion q (starts as identity)
+      // This represents the cube's current orientation relative to world coordinates
+      orientationQuaternion: new THREE.Quaternion(), // Identity quaternion (0,0,0,1)
+
+      // Apply LOCAL rotation: q = q * r (rotation in cube's current local frame)
+      applyLocalRotation(axis, angle) {
+        console.log('=== APPLYING LOCAL ROTATION ===');
+        console.log(`Rotating ${angle * 180 / Math.PI}° around local axis:`, axis.toArray().map(x => x.toFixed(3)));
+        console.log('Previous orientation quaternion q:', this.formatQuaternion(this.orientationQuaternion));
+
+        // Create rotation quaternion r from local axis and angle
+        const r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        console.log('Rotation quaternion r:', this.formatQuaternion(r));
+
+        // Apply local rotation: q = q * r
+        this.orientationQuaternion.multiply(r);
+        this.orientationQuaternion.normalize(); // Ensure unit quaternion
+
+        console.log('New orientation quaternion q = q * r:', this.formatQuaternion(this.orientationQuaternion));
+      },
+
+      // Apply WORLD rotation: q = r * q (rotation in world coordinate frame)
+      applyWorldRotation(axis, angle) {
+        console.log('=== APPLYING WORLD ROTATION ===');
+        console.log(`Rotating ${angle * 180 / Math.PI}° around world axis:`, axis.toArray().map(x => x.toFixed(3)));
+        console.log('Previous orientation quaternion q:', this.formatQuaternion(this.orientationQuaternion));
+
+        // Create rotation quaternion r from world axis and angle
+        const r = new THREE.Quaternion().setFromAxisAngle(axis, angle);
+        console.log('Rotation quaternion r:', this.formatQuaternion(r));
+
+        // Apply world rotation: q = r * q
+        this.orientationQuaternion.premultiply(r);
+        this.orientationQuaternion.normalize(); // Ensure unit quaternion
+
+        console.log('New orientation quaternion q = r * q:', this.formatQuaternion(this.orientationQuaternion));
+      },
+
+      // Apply VIEW rotation: convert view axis to world axis using camera, then apply world rotation
+      applyViewRotation(axisView, angle, camera) {
+        console.log('=== APPLYING VIEW ROTATION ===');
+        console.log(`Rotating ${angle * 180 / Math.PI}° around view axis:`, axisView.toArray().map(x => x.toFixed(3)));
+
+        // Convert axis_view → axis_world using camera orientation
+        const cameraQuat = camera.quaternion.clone();
+        const axisWorld = axisView.clone().applyQuaternion(cameraQuat);
+
+        console.log('Camera quaternion:', this.formatQuaternion(cameraQuat));
+        console.log('Converted to world axis:', axisWorld.toArray().map(x => x.toFixed(3)));
+
+        // Apply as world rotation
+        this.applyWorldRotation(axisWorld, angle);
+      },
+
+      // Helper function to format quaternion for logging
+      formatQuaternion(q) {
+        return `(${q.x.toFixed(3)}, ${q.y.toFixed(3)}, ${q.z.toFixed(3)}, ${q.w.toFixed(3)})`;
+      },
+
+      // Get current vertex position by applying orientation quaternion: v_world = q.rotate(v_local)
+      getCurrentPosition(vertexId) {
+        const original = this.originalVertices[vertexId];
+        if (!original) return null;
+
+        const localVec = new THREE.Vector3(original.x, original.y, original.z);
+        const worldVec = localVec.clone().applyQuaternion(this.orientationQuaternion);
+
+        return {
+          x: parseFloat(worldVec.x.toFixed(3)),
+          y: parseFloat(worldVec.y.toFixed(3)),
+          z: parseFloat(worldVec.z.toFixed(3))
+        };
+      },
+
+      // Get all current positions
+      getAllCurrentPositions() {
+        const current = {};
+        for (let id in this.originalVertices) {
+          current[id] = this.getCurrentPosition(id);
+        }
+        return current;
+      },
+
+      // Reset orientation to identity quaternion (q = identity)
+      resetOrientation() {
+        console.log('=== RESETTING ORIENTATION QUATERNION ===');
+        console.log('Previous quaternion q:', this.formatQuaternion(this.orientationQuaternion));
+
+        this.orientationQuaternion.set(0, 0, 0, 1); // Identity quaternion
+
+        console.log('Reset to identity quaternion q:', this.formatQuaternion(this.orientationQuaternion));
+        console.log('All vertices returned to original positions');
+      },
+
+      // Validate that orientation quaternion is normalized
+      validateQuaternion() {
+        const length = this.orientationQuaternion.length();
+        const isNormalized = Math.abs(length - 1.0) < 0.001; // Should be 1 for unit quaternions
+
+        console.log('=== QUATERNION VALIDATION ===');
+        console.log('Quaternion:', this.formatQuaternion(this.orientationQuaternion));
+        console.log('Length:', length.toFixed(6), isNormalized ? '✓ Normalized' : '✗ Not normalized');
+
+        if (!isNormalized) {
+          console.warn('Warning: Orientation quaternion is not normalized');
+          this.orientationQuaternion.normalize();
+          console.log('Normalized to:', this.formatQuaternion(this.orientationQuaternion));
+        }
+
+        return isNormalized;
+      },
+
+      // Get the current local axes of the cube by rotating standard axes with quaternion
+      getLocalAxes() {
+        const localX = new THREE.Vector3(1, 0, 0).applyQuaternion(this.orientationQuaternion);
+        const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(this.orientationQuaternion);
+        const localZ = new THREE.Vector3(0, 0, 1).applyQuaternion(this.orientationQuaternion);
+
+        return { localX, localY, localZ };
+      },
+
+      // Get Euler angles for debugging (note: can have gimbal lock issues)
+      getEulerAngles() {
+        const euler = new THREE.Euler().setFromQuaternion(this.orientationQuaternion);
+        return {
+          x: euler.x * 180 / Math.PI,
+          y: euler.y * 180 / Math.PI,
+          z: euler.z * 180 / Math.PI
+        };
+      },
+
+      // Legacy getter for compatibility
+      get vertices() {
+        return this.originalVertices;
+      },
+
+      // Get position of a specific vertex by ID (compatibility)
+      getVertexPosition(vertexId) {
+        return this.originalVertices[vertexId];
+      },
+
+      // Get all vertex positions (compatibility)
+      getAllPositions() {
+        return this.originalVertices;
+      },
+
+      // Set position of a vertex (compatibility)
+      setVertexPosition(vertexId, x, y, z) {
+        if (this.originalVertices[vertexId]) {
+          this.originalVertices[vertexId].x = x;
+          this.originalVertices[vertexId].y = y;
+          this.originalVertices[vertexId].z = z;
+        }
+      },
+
+      // Display all vertices with current rotated positions
+      showAllVertices() {
+        const vertexFaces = {
+          'V1': ['Green', 'White', 'Orange'],
+          'V2': ['Green', 'White', 'Red'],
+          'V3': ['Green', 'Yellow', 'Orange'],
+          'V4': ['Green', 'Yellow', 'Red'],
+          'V5': ['Blue', 'White', 'Orange'],
+          'V6': ['Blue', 'White', 'Red'],
+          'V7': ['Blue', 'Yellow', 'Orange'],
+          'V8': ['Blue', 'Yellow', 'Red']
+        };
+
+        const currentPositions = this.getAllCurrentPositions();
+
+        for (let id in currentPositions) {
+          const pos = currentPositions[id];
+          const colors = vertexFaces[id];
+          console.log(`${id}: ${colors.join(', ')} -> (${pos.x}, ${pos.y}, ${pos.z})`);
+        }
+        return currentPositions;
+      },
+
+      // Enhanced function to show vertex details with face information
+      showVertexDetails() {
+        console.log('=== CUBE VERTEX IDENTIFICATION ===');
+        for (let id in this.vertices) {
+          const v = this.vertices[id];
+          console.log(`${id}: ${v.name}`);
+          console.log(`  Position: (${v.x}, ${v.y}, ${v.z})`);
+          console.log(`  Located at: ${v.description}`);
+          console.log(`  Color code: ${v.color}`);
+          console.log('---');
+        }
+        return this.vertices;
+      },
+
+      // Get vertex by position
+      getVertexByPosition(x, y, z, tolerance = 0.1) {
+        for (let id in this.vertices) {
+          const v = this.vertices[id];
+          if (Math.abs(v.x - x) < tolerance &&
+            Math.abs(v.y - y) < tolerance &&
+            Math.abs(v.z - z) < tolerance) {
+            return { id, ...v };
+          }
+        }
+        return null;
+      },
+
+      // Show vertex layout diagram
+      showVertexDiagram() {
+        console.log('=== CUBE VERTEX LAYOUT DIAGRAM ===');
+        console.log('');
+        console.log('Front Face (Z = +1):');
+        console.log('  V1 ---- V2');
+        console.log('  |        |');
+        console.log('  |        |');
+        console.log('  V3 ---- V4');
+        console.log('');
+        console.log('Back Face (Z = -1):');
+        console.log('  V5 ---- V6');
+        console.log('  |        |');
+        console.log('  |        |');
+        console.log('  V7 ---- V8');
+        console.log('');
+        console.log('Coordinate System:');
+        console.log('  X-axis: Left (-) to Right (+)');
+        console.log('  Y-axis: Bottom (-) to Top (+)');
+        console.log('  Z-axis: Back (-) to Front (+)');
+        console.log('');
+        console.log('Face Colors (Standard Rubik\'s Cube):');
+        console.log('  Front (Z+): Green, Back (Z-): Blue');
+        console.log('  Right (X+): Red, Left (X-): Orange');
+        console.log('  Top (Y+): White, Bottom (Y-): Yellow');
+      }
+    };
+
+    // Functions to access vertex tracking
+    window.getVertexPosition = function (vertexId) {
+      return VertexTracker.getVertexPosition(vertexId);
+    };
+
+    window.getAllVertexPositions = function () {
+      return VertexTracker.getAllPositions();
+    };
+
+    window.showVertices = function () {
+      return VertexTracker.showAllVertices();
+    };
+
+    // Enhanced helper functions for vertex identification
+    window.showVertexDetails = function () {
+      return VertexTracker.showVertexDetails();
+    };
+
+    window.showVertexDiagram = function () {
+      VertexTracker.showVertexDiagram();
+    };
+
+    window.findVertex = function (x, y, z) {
+      return VertexTracker.getVertexByPosition(x, y, z);
+    };
+
+    window.identifyAllVertices = function () {
+      console.log('=== COMPLETE VERTEX IDENTIFICATION ===');
+      VertexTracker.showVertexDiagram();
+      console.log('');
+      VertexTracker.showVertexDetails();
+      return VertexTracker.getAllPositions();
+    };
+
+    // Function to highlight vertices with colors in the console
+    window.highlightVertices = function () {
+      console.log('=== VERTEX HIGHLIGHTING GUIDE ===');
+      console.log('');
+      console.log('%cV1: Front-Top-Left%c     (Red corner)', 'color: red; font-weight: bold;', 'color: black;');
+      console.log('%cV2: Front-Top-Right%c    (Blue corner)', 'color: blue; font-weight: bold;', 'color: black;');
+      console.log('%cV3: Front-Bottom-Left%c  (Yellow corner)', 'color: #DAA520; font-weight: bold;', 'color: black;');
+      console.log('%cV4: Front-Bottom-Right%c (Green corner)', 'color: green; font-weight: bold;', 'color: black;');
+      console.log('%cV5: Back-Top-Left%c      (Orange corner)', 'color: orange; font-weight: bold;', 'color: black;');
+      console.log('%cV6: Back-Top-Right%c     (Purple corner)', 'color: purple; font-weight: bold;', 'color: black;');
+      console.log('%cV7: Back-Bottom-Left%c   (Cyan corner)', 'color: cyan; font-weight: bold;', 'color: black;');
+      console.log('%cV8: Back-Bottom-Right%c  (Magenta corner)', 'color: magenta; font-weight: bold;', 'color: black;');
+      console.log('');
+      console.log('💡 Tip: Use these colors to mentally map vertices while rotating the cube!');
+    };
+
+    // Function to show current vertex positions after rotations
+    window.getCurrentVertexPositions = function () {
+      console.log('=== CURRENT VERTEX POSITIONS ===');
+      if (cube && cube.holder) {
+        // Apply current rotation to all vertices
+        const rotationMatrix = new THREE.Matrix4().makeRotationFromQuaternion(cube.holder.quaternion);
+
+        for (let id in VertexTracker.vertices) {
+          const v = VertexTracker.vertices[id];
+          const originalPos = new THREE.Vector3(v.x, v.y, v.z);
+          const currentPos = originalPos.clone().applyMatrix4(rotationMatrix);
+
+          console.log(`${id}: ${v.name}`);
+          console.log(`  Original: (${v.x}, ${v.y}, ${v.z})`);
+          console.log(`  Current:  (${currentPos.x.toFixed(2)}, ${currentPos.y.toFixed(2)}, ${currentPos.z.toFixed(2)})`);
+          console.log('---');
+        }
+      } else {
+        console.log('Cube not yet loaded. Showing initial positions:');
+        VertexTracker.showAllVertices();
+      }
+    };
+
+    // Function to find vertex by 3 face colors (corner pieces)
+    window.findVertexByColors = function (color1, color2, color3) {
+      // Convert color names to face letters
+      const colorToFace = {
+        'white': 'U', 'up': 'U',
+        'yellow': 'D', 'down': 'D',
+        'red': 'R', 'right': 'R',
+        'orange': 'L', 'left': 'L',
+        'green': 'F', 'front': 'F',
+        'blue': 'B', 'back': 'B'
+      };
+
+      // Normalize input colors
+      const face1 = colorToFace[color1.toLowerCase()] || color1.toUpperCase();
+      const face2 = colorToFace[color2.toLowerCase()] || color2.toUpperCase();
+      const face3 = colorToFace[color3.toLowerCase()] || color3.toUpperCase();
+
+      const inputFaces = [face1, face2, face3].sort();
+
+      console.log(`🔍 Looking for vertex with faces: ${inputFaces.join(', ')}`);
+
+      // Define each vertex's 3 faces
+      const vertexFaces = {
+        'V1': ['F', 'U', 'L'], // Front, Top, Left (Green, White, Orange)
+        'V2': ['F', 'U', 'R'], // Front, Top, Right (Green, White, Red)
+        'V3': ['F', 'D', 'L'], // Front, Bottom, Left (Green, Yellow, Orange)
+        'V4': ['F', 'D', 'R'], // Front, Bottom, Right (Green, Yellow, Red)
+        'V5': ['B', 'U', 'L'], // Back, Top, Left (Blue, White, Orange)
+        'V6': ['B', 'U', 'R'], // Back, Top, Right (Blue, White, Red)
+        'V7': ['B', 'D', 'L'], // Back, Bottom, Left (Blue, Yellow, Orange)
+        'V8': ['B', 'D', 'R']  // Back, Bottom, Right (Blue, Yellow, Red)
+      };
+
+      // Find matching vertex
+      for (let vertexId in vertexFaces) {
+        const faces = vertexFaces[vertexId].sort();
+        if (JSON.stringify(faces) === JSON.stringify(inputFaces)) {
+          const vertex = VertexTracker.vertices[vertexId];
+          console.log(`✅ Found: ${vertexId} (${vertex.name})`);
+          console.log(`   Position: (${vertex.x}, ${vertex.y}, ${vertex.z})`);
+          console.log(`   Face combination: ${faces.join(', ')}`);
+          console.log(`   Description: ${vertex.description}`);
+          return { id: vertexId, ...vertex, faces: faces };
+        }
+      }
+
+      console.log(`❌ No vertex found with faces: ${inputFaces.join(', ')}`);
+      console.log('Available face combinations:');
+      for (let vertexId in vertexFaces) {
+        console.log(`   ${vertexId}: ${vertexFaces[vertexId].join(', ')}`);
+      }
+      return null;
+    };
+
+    // Function to show all vertex-face combinations
+    window.showVertexFaceCombinations = function () {
+      console.log('=== VERTEX FACE COMBINATIONS ===');
+      console.log('Each vertex is where 3 faces meet:');
+      console.log('');
+
+      const vertexFaces = {
+        'V1': { faces: ['F', 'U', 'L'], colors: ['Green', 'White', 'Orange'] },
+        'V2': { faces: ['F', 'U', 'R'], colors: ['Green', 'White', 'Red'] },
+        'V3': { faces: ['F', 'D', 'L'], colors: ['Green', 'Yellow', 'Orange'] },
+        'V4': { faces: ['F', 'D', 'R'], colors: ['Green', 'Yellow', 'Red'] },
+        'V5': { faces: ['B', 'U', 'L'], colors: ['Blue', 'White', 'Orange'] },
+        'V6': { faces: ['B', 'U', 'R'], colors: ['Blue', 'White', 'Red'] },
+        'V7': { faces: ['B', 'D', 'L'], colors: ['Blue', 'Yellow', 'Orange'] },
+        'V8': { faces: ['B', 'D', 'R'], colors: ['Blue', 'Yellow', 'Red'] }
+      };
+
+      for (let vertexId in vertexFaces) {
+        const info = vertexFaces[vertexId];
+        const vertex = VertexTracker.vertices[vertexId];
+        console.log(`${vertexId}: ${vertex.name}`);
+        console.log(`   Faces: ${info.faces.join(', ')} = ${info.colors.join(', ')}`);
+        console.log(`   Position: (${vertex.x}, ${vertex.y}, ${vertex.z})`);
+        console.log('');
+      }
+
+      console.log('💡 Usage examples:');
+      console.log('   findVertexByColors("red", "green", "white") → V2');
+      console.log('   findVertexByColors("orange", "blue", "yellow") → V7');
+      console.log('   findVertexByColors("F", "U", "L") → V1');
+    };
+
+    // Quick lookup functions for common color combinations
+    window.findRedGreenWhite = () => findVertexByColors('red', 'green', 'white');
+    window.findOrangeBlueYellow = () => findVertexByColors('orange', 'blue', 'yellow');
+    window.findGreenWhiteOrange = () => findVertexByColors('green', 'white', 'orange');
+
+    // Test function to verify vertex tracking works
+    window.testVertexTracking = function () {
+      console.log('=== TESTING VERTEX TRACKING ===');
+      console.log('Initial positions:');
+      console.log('V1 should be at (-1, 1, 1)');
+      console.log('V2 should be at (1, 1, 1)');
+      console.log('');
+
+      console.log('Current positions:');
+      VertexTracker.showAllVertices();
+
+      console.log('');
+      console.log('Now try rotating the cube and run this again!');
+      console.log('The coordinates should change after rotation.');
+    };
+
+    // Function to show vertex movement comparison
+    window.compareVertexPositions = function () {
+      console.log('=== VERTEX POSITION COMPARISON ===');
+
+      const vertexFaces = {
+        'V1': ['Green', 'White', 'Orange'],
+        'V2': ['Green', 'White', 'Red'],
+        'V3': ['Green', 'Yellow', 'Orange'],
+        'V4': ['Green', 'Yellow', 'Red'],
+        'V5': ['Blue', 'White', 'Orange'],
+        'V6': ['Blue', 'White', 'Red'],
+        'V7': ['Blue', 'Yellow', 'Orange'],
+        'V8': ['Blue', 'Yellow', 'Red']
+      };
+
+      if (cube && cube.holder) {
+        const rotationMatrix = new THREE.Matrix4().makeRotationFromQuaternion(cube.holder.quaternion);
+
+        for (let id in VertexTracker.vertices) {
+          const v = VertexTracker.vertices[id];
+          const colors = vertexFaces[id];
+          const originalPos = new THREE.Vector3(v.x, v.y, v.z);
+          const currentPos = originalPos.clone().applyMatrix4(rotationMatrix);
+
+          console.log(`${id}: ${colors.join(', ')}`);
+          console.log(`  Original: (${v.x}, ${v.y}, ${v.z})`);
+          console.log(`  Current:  (${currentPos.x.toFixed(2)}, ${currentPos.y.toFixed(2)}, ${currentPos.z.toFixed(2)})`);
+
+          // Check if position changed
+          const hasChanged = Math.abs(currentPos.x - v.x) > 0.01 ||
+            Math.abs(currentPos.y - v.y) > 0.01 ||
+            Math.abs(currentPos.z - v.z) > 0.01;
+          console.log(`  Status: ${hasChanged ? '🔄 MOVED' : '⭐ UNCHANGED'}`);
+          console.log('---');
+        }
+      } else {
+        console.log('Cube not loaded yet.');
+      }
+    };    // Function to show all current cube vertices and positions
+    window.showAllVertices = function () {
+      if (typeof cube !== 'undefined' && cube) {
+
+
+        // Show the 8 corner vertices with tracking
+
+        CubeVertexTracker.getCurrentPositions().forEach(vertex => {
+          console.log(`${vertex.id} (${vertex.name}): 
+            Initial: (${vertex.initial.x}, ${vertex.initial.y}, ${vertex.initial.z})
+            Current: (${vertex.current.x}, ${vertex.current.y}, ${vertex.current.z})`);
+        });
+
+        // Show the generated positions from the cube
+
+        cube.positions.forEach((pos, index) => {
+          const cornerVertex = CubeVertexTracker.getVertexAtPosition(pos.x, pos.y, pos.z);
+          const vertexInfo = cornerVertex ? ` [CORNER: ${cornerVertex.id}]` : '';
+
+        });
+
+        // Show cube size and calculation details
+
+
+
+
+
+
+        // Show edge mappings
+
+
+
+
+        return {
+          cornerVertices: CubeVertexTracker.getCurrentPositions(),
+          allPositions: cube.positions,
+          pieces: cube.pieces,
+          size: cube.size
+        };
+      } else {
+
+        return null;
+      }
+    };
+
+    // Function to track vertex positions during rotations
+    window.trackVertexRotation = function (direction) {
+
+
+      // Show positions before rotation
+
+      CubeVertexTracker.getCurrentPositions().forEach(vertex => {
+
+      });
+
+      // Create rotation matrix based on direction
+      const rotationMatrix = new THREE.Matrix3();
+      const angle = Math.PI / 2; // 90 degrees
+
+      switch (direction) {
+        case 'clockwiseZ':
+          rotationMatrix.makeRotationZ(-angle); // Clockwise Z
+          break;
+        case 'counterClockwiseZ':
+          rotationMatrix.makeRotationZ(angle); // Counter-clockwise Z
+          break;
+        case 'clockwiseX':
+        case 'right':
+          rotationMatrix.makeRotationX(angle); // Right (X-axis)
+          break;
+        case 'counterClockwiseX':
+        case 'left':
+          rotationMatrix.makeRotationX(-angle); // Left (X-axis opposite)
+          break;
+        case 'clockwiseY':
+        case 'up':
+          rotationMatrix.makeRotationY(angle); // Up (Y-axis)
+          break;
+        case 'counterClockwiseY':
+        case 'down':
+          rotationMatrix.makeRotationY(-angle); // Down (Y-axis opposite)
+          break;
+        default:
+          console.warn(`Unknown rotation direction: ${direction}`);
+          return;
+      }
+
+      // Apply rotation to vertices
+      CubeVertexTracker.applyRotation(rotationMatrix);
+
+      // Show positions after rotation
+
+      CubeVertexTracker.getCurrentPositions().forEach(vertex => {
+
+      });
+
+
+    };
+
+    // Helper functions for invalid cube configuration
+    function loadValidScrambledState() {
+      // Load a known valid scrambled state that works with Kociemba
+      const validScrambledState = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+      loadCubeState(validScrambledState);
+      clearSolution();
+      showToast('Loaded a valid scrambled cube state (13 moves to solve)!', 'success', 3000);
+    }
+
+    function resetToSolvedState() {
+      // For now, use the working state since we don't have the true solved state format
+      const workingState = "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+      loadCubeState(workingState);
+      clearSolution();
+      showToast('Loaded working cube state (not actually solved, but valid for testing)!', 'success', 3000);
+    }
+
+    function showValidStateExamples() {
+      let solutionPanel = document.getElementById('solutionPanel');
+      if (!solutionPanel) {
+        solutionPanel = document.createElement('div');
+        solutionPanel.id = 'solutionPanel';
+        solutionPanel.className = 'solution-panel';
+        document.querySelector('.controls-panel').appendChild(solutionPanel);
+      }
+
+      solutionPanel.innerHTML = `
+        <div class="section">
+          <h2>📚 Valid Cube State Examples</h2>
+          <div class="solution-info">
+            <p><strong>Working Test State (13 moves to solve):</strong></p>
+            <div class="solution-moves">UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB</div>
+            <button class="btn" onclick="loadCubeState('UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB')">Load Test State</button>
+            
+            <p><strong>Note:</strong> This state looks like a "solved" cube (all faces same color) but actually needs 13 moves to solve according to Kociemba's algorithm. This is because the cube notation format represents the cube's internal state, not just the visual appearance.</p>
+            
+            <p><strong>Tips for valid cube states:</strong></p>
+            <ul>
+              <li>✅ Must have exactly 9 of each color (U,R,F,D,L,B)</li>
+              <li>✅ Centers must be in correct positions (4,13,22,31,40,49)</li>
+              <li>✅ Must represent a physically possible cube configuration</li>
+              <li>❌ Manually coloring pieces randomly creates impossible configurations</li>
+              <li>💡 Use 'Load Cube State' with known valid states instead</li>
+            </ul>
+            
+            <button class="btn" onclick="clearSolution()">❌ Close</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Error handling
+    window.addEventListener('error', (e) => {
+      console.error('Global error:', e.error);
+      updateStatus('Error: ' + e.error.message);
+    });
+
+    // Debug function to manually test solve button update
+    window.testSolveButton = function() {
+      console.log('🧪 Manual test of solve button update');
+      updateSolveButton();
+    };
+
+    // Debug function to check cube state
+    window.debugCubeState = function() {
+      console.log('🔍 Debug cube state:');
+      console.log('Cube object:', cube);
+      console.log('Edges count:', cube?.edges?.length || 'no edges');
+      
+      if (cube && cube.edges) {
+        console.log('First 10 edges:');
+        cube.edges.slice(0, 10).forEach((edge, i) => {
+          const color = edge.material.color.getHex();
+          console.log(`Edge ${i}: color=${color.toString(16)}, name=${edge.name}`);
+        });
+      }
+      
+      const colorCounts = countColors();
+      console.log('Color counts:', colorCounts);
+      console.log('Is complete:', isCubeComplete());
+    };
+  </script>
+</body>
+
+</html>

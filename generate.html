@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+<body>
+  <pre id="out"></pre>
+
+  <script>
+    // Build solved cube: 9 stickers per face
+    function solvedCube() {
+      return {
+        U: Array(9).fill('U'),
+        R: Array(9).fill('R'),
+        F: Array(9).fill('F'),
+        D: Array(9).fill('D'),
+        L: Array(9).fill('L'),
+        B: Array(9).fill('B')
+      };
+    }
+
+    // Rotate a 3x3 face clockwise
+    function rotateFace(face) {
+      return [
+        face[6], face[3], face[0],
+        face[7], face[4], face[1],
+        face[8], face[5], face[2]
+      ];
+    }
+
+    // Move functions (clockwise only)
+    function moveU(c) {
+      c.U = rotateFace(c.U);
+      const t = c.F.slice(0, 3);
+      c.F.splice(0, 3, ...c.R.slice(0, 3));
+      c.R.splice(0, 3, ...c.B.slice(0, 3));
+      c.B.splice(0, 3, ...c.L.slice(0, 3));
+      c.L.splice(0, 3, ...t);
+    }
+    function moveD(c) {
+      c.D = rotateFace(c.D);
+      const t = c.F.slice(6, 9);
+      c.F.splice(6, 3, ...c.L.slice(6, 9));
+      c.L.splice(6, 3, ...c.B.slice(6, 9));
+      c.B.splice(6, 3, ...c.R.slice(6, 9));
+      c.R.splice(6, 3, ...t);
+    }
+    function moveF(c) {
+      c.F = rotateFace(c.F);
+      const t = [c.U[6], c.U[7], c.U[8]];
+      [c.U[6], c.U[7], c.U[8]] = [c.L[8], c.L[5], c.L[2]];
+      [c.L[2], c.L[5], c.L[8]] = [c.D[2], c.D[1], c.D[0]];
+      [c.D[0], c.D[1], c.D[2]] = [c.R[6], c.R[3], c.R[0]];
+      [c.R[0], c.R[3], c.R[6]] = t;
+    }
+    function moveB(c) {
+      c.B = rotateFace(c.B);
+      const t = [c.U[0], c.U[1], c.U[2]];
+      [c.U[0], c.U[1], c.U[2]] = [c.R[2], c.R[5], c.R[8]];
+      [c.R[2], c.R[5], c.R[8]] = [c.D[8], c.D[7], c.D[6]];
+      [c.D[6], c.D[7], c.D[8]] = [c.L[0], c.L[3], c.L[6]];
+      [c.L[0], c.L[3], c.L[6]] = t;
+    }
+    function moveR(c) {
+      c.R = rotateFace(c.R);
+      const t = [c.U[2], c.U[5], c.U[8]];
+      [c.U[2], c.U[5], c.U[8]] = [c.F[2], c.F[5], c.F[8]];
+      [c.F[2], c.F[5], c.F[8]] = [c.D[2], c.D[5], c.D[8]];
+      [c.D[2], c.D[5], c.D[8]] = [c.B[6], c.B[3], c.B[0]];
+      [c.B[0], c.B[3], c.B[6]] = t.reverse();
+    }
+    function moveL(c) {
+      c.L = rotateFace(c.L);
+      const t = [c.U[0], c.U[3], c.U[6]];
+      [c.U[0], c.U[3], c.U[6]] = [c.B[8], c.B[5], c.B[2]];
+      [c.B[2], c.B[5], c.B[8]] = [c.D[0], c.D[3], c.D[6]];
+      [c.D[0], c.D[3], c.D[6]] = [c.F[0], c.F[3], c.F[6]];
+      [c.F[0], c.F[3], c.F[6]] = t;
+    }
+
+    const MOVES = { U: moveU, R: moveR, F: moveF, D: moveD, L: moveL, B: moveB };
+
+    // Apply N random moves
+    function randomScrambleCube(moves = 25) {
+      const cube = solvedCube();
+      const faces = Object.keys(MOVES);
+      for (let i = 0; i < moves; i++) {
+        const f = faces[Math.floor(Math.random() * faces.length)];
+        MOVES[f](cube); // clockwise
+      }
+      return cube;
+    }
+
+    // Flatten into 54-char string (U,R,F,D,L,B order)
+    function cubeToString(cube) {
+      return [...cube.U, ...cube.R, ...cube.F, ...cube.D, ...cube.L, ...cube.B].join('');
+    }
+
+    // Generate scrambled state
+    const scrambled = randomScrambleCube();
+    document.getElementById('out').textContent =
+      "Scrambled cube state (U,R,F,D,L,B):\n" + cubeToString(scrambled);
+  </script>
+</body>
+
+</html>
